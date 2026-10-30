@@ -1,4 +1,4 @@
-name = "museai-oauth"
+name = "museai-oauth2"
 main = "worker.js"
 compatibility_date = "2026-10-28"
 workers_dev = false
@@ -22,13 +22,18 @@ class_name = "OAuthRecord"
 name = "RATE_LIMIT"
 class_name = "RateLimitBucket"
 
+# Free-plan note (build step 6, 2026-10-30): Cloudflare's free plan
+# refuses to create Durable Object classes from `new_classes`
+# (deploy error 10097). Classes must be created with
+# `new_sqlite_classes` instead. No deploy had succeeded before this
+# change, so no existing class is affected by the switch.
 [[migrations]]
 tag = "v1"
-new_classes = ["OAuthRecord"]
+new_sqlite_classes = ["OAuthRecord"]
 
 [[migrations]]
 tag = "v2"
-new_classes = ["RateLimitBucket"]
+new_sqlite_classes = ["RateLimitBucket"]
 
 # This is not signing-key rotation. See docs/KEY-ROTATION.md before enabling.
 [triggers]

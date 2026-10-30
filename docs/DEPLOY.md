@@ -32,11 +32,13 @@ Tests: `node --test` (plain node, no Cloudflare runtime — see
   and every endpoint URL in it sits under `/login`. Until `ISSUER`
   and `BASE_PATH` are set as dashboard variables, discovery and JWKS
   answer 503 by design.
-- [ ] **Cloudflare route — HIS dashboard action, NOT done.** Create
-  the route `fedpromptly.com/login*` pointing at this worker, so
-  requests under `/login` reach it and everything else on
-  fedpromptly.com is untouched. Nothing in this repo creates that
-  route; it is a dashboard action by the owner.
+- [x] **Cloudflare route — DONE by Git-FED 2026-10-30 (his dashboard
+  action).** The route `fedpromptly.com/login*` points at worker
+  `museai-oauth2`, proven by his 11:34–11:35 EDT Workers Builds log
+  (route table shown in the log). Nothing in this repo creates that
+  route. First deploy through it FAILED on wrangler.toml blockers
+  (error 10097 + worker-name mismatch), fixed in build step 6 —
+  redeploy on push is still unobserved.
 - [ ] **First clients.** Which of his own sites become the first
   registered clients, and their exact redirect URIs. Registration is
   via the admin endpoints (below), never by editing code. (The
@@ -162,9 +164,10 @@ announcement:
 
 ## Release checklist — all boxes must be checked, then his go-ahead
 
-- [ ] Cloudflare route `fedpromptly.com/login*` created (his
-  dashboard action); `ISSUER` set to
-  `https://fedpromptly.com/login`, `BASE_PATH` set to `/login`.
+- [x] Cloudflare route `fedpromptly.com/login*` created (his
+  dashboard action, 2026-10-30).
+- [ ] `ISSUER` set to `https://fedpromptly.com/login`, `BASE_PATH`
+  set to `/login` (dashboard variables, not set yet).
 - [ ] `ADMIN_TOKEN`, `SIGNING_KEY_JWK`, `SIGNING_PUBLIC_JWK` set as
   dashboard secrets/variables. No test keys.
 - [ ] All three bindings verified live (OAUTH_KV, OAUTH_STORE,
@@ -181,7 +184,9 @@ announcement:
 ## Still not done, stated plainly
 
 - Runtime proof on Cloudflare (above) — node tests only, so far.
-- The `fedpromptly.com/login*` route itself — his dashboard action.
+- The `fedpromptly.com/login*` route itself — DONE by Git-FED
+  2026-10-30 (his dashboard action); the first deploy through it
+  failed on step-6 blockers, redeploy unobserved.
 - `ADMIN_TOKEN` and signing keys — unset anywhere.
 - Registry population — zero records exist until the admin action.
 - Approval-page UX beyond this step: the signed payload is still

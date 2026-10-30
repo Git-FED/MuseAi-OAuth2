@@ -353,3 +353,35 @@ oauth-flow + 1 safety + 10 step3 + 8 step4 + 8 step5).
   JSON; a direct Muse handoff (no paste) is later polish.
 - His go-ahead + release checklist sign-off: not given. Nothing
   deployed, nothing pushed to GitHub in this step.
+
+## Step 6 — deploy blockers fixed (2026-10-30 ~11:37 EDT, his tap)
+
+Git-FED connected the repo to Cloudflare Workers Builds himself (worker
+museai-oauth2, route fedpromptly.com/login) and pasted the 11:34–11:35
+EDT build log. The build uploaded and Cloudflare recognized all three
+bindings, then failed on two wrangler.toml items, both fixed here:
+
+- Deploy error 10097 (free plan): migrations used `new_classes`.
+  Free plans require `new_sqlite_classes` to create Durable Object
+  classes. v1 (OAuthRecord) and v2 (RateLimitBucket) now use
+  `new_sqlite_classes`. No deploy had succeeded before this change, so
+  no existing class is affected. The DO code uses only the standard
+  storage API (put/get/delete/alarm), which SQLite-backed objects
+  support the same way.
+- Worker name mismatch: config said `museai-oauth`, the dashboard
+  worker is `museai-oauth2`. Config now says `museai-oauth2`, so
+  Builds stops overriding and warning.
+
+Verification: wrangler.toml parses (name museai-oauth2, both
+migrations new_sqlite_classes, workers_dev still false); node tests
+still 47/47 — this step touches config only, no code.
+
+**Still gaps, declared honestly:**
+- The redeploy itself: Git-FED pushes this zip; Workers Builds
+  redeploys on push. A green deploy is expected but NOT yet observed.
+- After a green deploy, logins still will not work until the
+  dashboard variables and secrets are set (ISSUER, BASE_PATH,
+  ADMIN_TOKEN, ES256 signing keys) — the worker fails closed without
+  them. That is the next step, not a new problem.
+- Runtime proof, registry population, his go-ahead + checklist
+  sign-off: unchanged from step 5.
