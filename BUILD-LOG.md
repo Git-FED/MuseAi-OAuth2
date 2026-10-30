@@ -385,3 +385,48 @@ still 47/47 — this step touches config only, no code.
   them. That is the next step, not a new problem.
 - Runtime proof, registry population, his go-ahead + checklist
   sign-off: unchanged from step 5.
+
+## Step 7 — rate-limit hardening (2026-10-30, after the production 503 outage)
+
+Problem: after the step-6 rebuild + dashboard repair (all 8 bindings
+verified live on serving v18, workers.dev back, health + JWKS 200),
+EVERY rate-limited route still answered 503 — authorize, device,
+token, admin — on fresh buckets and fresh windows, from both the
+VM and Git-FED's own browser. A live wrangler tail with a marked
+probe proved the RateLimitBucket `hit` RPC runs clean (outcome ok,
+no exceptions) yet the worker still answers 503. Kill switch is off
+(no binding), the deployed bundle is byte-identical to this source,
+and the router's 503 branches (kill switch / unavailable / catch)
+do not explain a clean RPC + no exception + 503. Root cause of the
+original 503 is therefore still UNKNOWN — this step does not claim
+otherwise.
+
+What step 7 changes (src/auth/rate-limit.js, src/router.js):
+- checkRateLimit never throws anymore. A storage/transient error
+  (DO call throws, or returns a malformed result without a boolean
+  `allowed`) logs loudly (console.warn, visible in wrangler tail)
+  and returns { allowed: true, degraded: true }: throttling
+  degrades, but a broken limiter no longer takes the whole provider
+  down. The missing-binding case STILL fails closed (503) — a
+  config error is not a transient, and that distinction is kept.
+- Both router 503 paths now console.error the branch (unavailable
+  vs catch) with the path, so the next tail shows which branch
+  fired — the diagnostic that was missing on 2026-10-30.
+- Degraded allows are audited (rate_limit_degraded) so a broken
+  limiter leaves a trail in KV while requests proceed.
+- Degraded allow removes THROTTLING only, never authentication:
+  admin tokens, Muse signatures, and PKCE still apply downstream.
+
+What step 7 deliberately does NOT do: move rate limiting to KV.
+Free-tier KV allows 1,000 writes/day account-wide; a KV limiter
+writes on every rate-checked request and would exhaust that in
+minutes at any real traffic, then fail closed back into 503s.
+The DO limiter stays (no write cap); only its failure mode changes.
+
+Verification: node tests 51/51 (47 prior + 4 new step7 tests:
+store throw -> degraded allow + audit; malformed result ->
+degraded allow; missing binding -> still 503; working limiter ->
+device page 200). Zip delivered for Git-FED to push; after a green
+deploy, the tail check is: rate-limited routes must answer (not
+503), and any `rate-limit degraded` warnings in the tail name the
+real storage fault for step 8.

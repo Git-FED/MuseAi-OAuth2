@@ -67,15 +67,26 @@ export async function route(request, env) {
   }
   // Rate limits run before the handler (and before admin auth, so token
   // guessing is throttled too). A missing RATE_LIMIT binding fails closed.
+  // STEP 7: both 503 paths log loudly (a silent 503 hid the production
+  // outage's cause on 2026-10-30 — the next tail must show which branch
+  // fired). Degraded allows are audited so a broken limiter leaves a
+  // trail in KV even while requests proceed.
   if (RATE_LIMITS[path]) {
     try {
       const limit = await checkRateLimit(request, env, path);
-      if (limit.unavailable) return json({ error: "temporarily_unavailable" }, 503);
+      if (limit.unavailable) {
+        console.error(`rate-limit unavailable for ${path}: RATE_LIMIT binding missing`);
+        return json({ error: "temporarily_unavailable" }, 503);
+      }
+      if (limit.degraded) {
+        await audit(env, "rate_limit_degraded", { clientId: limit.clientId ?? null, route: path, outcome: "degraded_allow", detail: "storage error, throttling degraded" });
+      }
       if (!limit.allowed) {
         await audit(env, "rate_limited", { clientId: limit.clientId, route: path, outcome: "blocked", detail: `bucket:${limit.bucket}` });
         return json({ error: "rate_limited" }, 429, { "retry-after": String(limit.retryAfter) });
       }
-    } catch {
+    } catch (e) {
+      console.error(`rate-limit error for ${path}: ${String(e && e.message ? e.message : e).slice(0, 200)}`);
       return json({ error: "temporarily_unavailable" }, 503);
     }
   }

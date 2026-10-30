@@ -168,8 +168,9 @@ announcement:
   dashboard action, 2026-10-30).
 - [ ] `ISSUER` set to `https://fedpromptly.com/login`, `BASE_PATH`
   set to `/login` (dashboard variables, not set yet).
-- [ ] `ADMIN_TOKEN`, `SIGNING_KEY_JWK`, `SIGNING_PUBLIC_JWK` set as
-  dashboard secrets/variables. No test keys.
+- [ ] Secrets set as dashboard secrets (encrypted): `ADMIN_TOKEN`,
+  `SIGNING_KEY_JWK`. Plain dashboard variable (NOT a secret):
+  `SIGNING_PUBLIC_JWK`. No test keys.
 - [ ] All three bindings verified live (OAUTH_KV, OAUTH_STORE,
   RATE_LIMIT; migrations v1 + v2 applied).
 - [ ] First client(s) + Muse key(s) registered via the admin
@@ -181,17 +182,34 @@ announcement:
 - [ ] **His explicit go-ahead to deploy.** No deploy happens on a
   checklist alone.
 
+## Step 7 — rate-limit hardening (2026-10-30, after the 503 outage)
+
+All rate-limited routes answered 503 in production even though the
+rate-limit store call ran clean (proven by live tail). Step 7 keeps
+the DO limiter but changes its failure mode: a storage/transient
+error now logs loudly and degrades to allow (throttling off, auth
+still on); a missing binding still fails closed (503). Both router
+503 paths now log which branch fired. After pushing step 7 and a
+green deploy, re-test authorize/device/token/admin: they must
+answer (not 503). If the tail shows `rate-limit degraded` warnings,
+those lines name the real storage fault for step 8. If routes still
+503 with `rate-limit unavailable` in the tail, the RATE_LIMIT
+binding itself is not reaching the worker at runtime.
+
 ## Still not done, stated plainly
 
 - Runtime proof on Cloudflare (above) — node tests only, so far.
-- The `fedpromptly.com/login*` route itself — DONE by Git-FED
-  2026-10-30 (his dashboard action); the first deploy through it
-  failed on step-6 blockers, redeploy unobserved.
-- `ADMIN_TOKEN` and signing keys — unset anywhere.
-- Registry population — zero records exist until the admin action.
+- The `www.fedpromptly.com/login*` route itself — route exists as
+  `www.fedpromptly.com/login` (no star yet, 2026-10-30); the star
+  is still pending on the dashboard, or paths under /login will not
+  route to the worker on www.
+- `ADMIN_TOKEN` and signing keys — SET 2026-10-30 (dashboard +
+  #private-data); SIGNING_PUBLIC_JWK re-added as a plain variable.
+- Registry population — zero records exist until the admin action
+  (blocked by the 503; step 7 unblocks the admin routes).
 - Approval-page UX beyond this step: the signed payload is still
   pasted JSON; a direct Muse handoff (no paste) is a later polish.
 - His go-ahead + release checklist sign-off — not given.
 
-Domain + ISSUER are decided (`https://fedpromptly.com/login`,
+Domain + ISSUER are decided (`https://www.fedpromptly.com/login`,
 `BASE_PATH=/login`, 2026-10-30) — that box is no longer open.

@@ -50,44 +50,67 @@ async function bodyField(request, field) {
   return null;
 }
 
+// One bucket hit with shape validation: the store must answer with a
+// boolean `allowed`, or the result is unusable (treated as a storage
+// error by the caller, never as an allow or a block on its own).
+async function hitBucket(env, key, limit, windowMs) {
+  const res = await rateLimitStub(env, key).hit(limit, windowMs);
+  if (!res || typeof res.allowed !== "boolean") {
+    throw new Error(`malformed rate-limit result for ${key}`);
+  }
+  return res;
+}
+
 // Returns { allowed: true } or { allowed: false, retryAfter, bucket,
 // clientId } or { unavailable: true } when the binding is missing.
+// STEP 7: a storage/transient error does NOT fail closed. It logs loudly
+// and returns { allowed: true, degraded: true } — throttling degrades,
+// but a broken limiter must not take the whole provider down (that is
+// exactly what happened in production 2026-10-30: the store call ran
+// clean, yet every rate-limited route answered 503). The missing-binding
+// case still fails closed (config error, not a transient). Degraded
+// allows never skip authentication: admin tokens, Muse signatures, and
+// PKCE still apply downstream.
 export async function checkRateLimit(request, env, path) {
   const cfg = RATE_LIMITS[path];
   if (!cfg) return { allowed: true };
   if (!env.RATE_LIMIT) return { unavailable: true };
-
-  const ip = clientIp(request);
-  const ipRes = await rateLimitStub(env, `rl:ip:${path}:${ip}`).hit(cfg.ip, cfg.windowMs);
-  if (!ipRes.allowed) {
-    return { allowed: false, retryAfter: Math.ceil(ipRes.resetMs / 1000) || 1, bucket: "ip", clientId: null };
-  }
-
-  if (cfg.client) {
-    let clientId = null;
-    if (request.method === "GET") {
-      clientId = new URL(request.url).searchParams.get("client_id");
-    } else {
-      clientId = await bodyField(request, "client_id");
+  try {
+    const ip = clientIp(request);
+    const ipRes = await hitBucket(env, `rl:ip:${path}:${ip}`, cfg.ip, cfg.windowMs);
+    if (!ipRes.allowed) {
+      return { allowed: false, retryAfter: Math.ceil(ipRes.resetMs / 1000) || 1, bucket: "ip", clientId: null };
     }
-    if (clientId) {
-      const cRes = await rateLimitStub(env, `rl:client:${path}:${clientId}`).hit(cfg.client, cfg.windowMs);
-      if (!cRes.allowed) {
-        return { allowed: false, retryAfter: Math.ceil(cRes.resetMs / 1000) || 1, bucket: "client", clientId };
+
+    if (cfg.client) {
+      let clientId = null;
+      if (request.method === "GET") {
+        clientId = new URL(request.url).searchParams.get("client_id");
+      } else {
+        clientId = await bodyField(request, "client_id");
       }
-      return { allowed: true, clientId };
-    }
-  }
-
-  if (cfg.pending) {
-    const pendingId = (await bodyField(request, "pending_id")) || (await bodyField(request, "device_code"));
-    if (pendingId) {
-      const pRes = await rateLimitStub(env, `rl:pending:${pendingId}`).hit(cfg.pending, cfg.pendingWindowMs);
-      if (!pRes.allowed) {
-        return { allowed: false, retryAfter: Math.ceil(pRes.resetMs / 1000) || 1, bucket: "pending", clientId: null };
+      if (clientId) {
+        const cRes = await hitBucket(env, `rl:client:${path}:${clientId}`, cfg.client, cfg.windowMs);
+        if (!cRes.allowed) {
+          return { allowed: false, retryAfter: Math.ceil(cRes.resetMs / 1000) || 1, bucket: "client", clientId };
+        }
+        return { allowed: true, clientId };
       }
     }
-  }
 
-  return { allowed: true, clientId: null };
+    if (cfg.pending) {
+      const pendingId = (await bodyField(request, "pending_id")) || (await bodyField(request, "device_code"));
+      if (pendingId) {
+        const pRes = await hitBucket(env, `rl:pending:${pendingId}`, cfg.pending, cfg.pendingWindowMs);
+        if (!pRes.allowed) {
+          return { allowed: false, retryAfter: Math.ceil(pRes.resetMs / 1000) || 1, bucket: "pending", clientId: null };
+        }
+      }
+    }
+
+    return { allowed: true, clientId: null };
+  } catch (e) {
+    console.warn(`rate-limit degraded for ${path}: ${String(e && e.message ? e.message : e).slice(0, 200)}`);
+    return { allowed: true, degraded: true };
+  }
 }
