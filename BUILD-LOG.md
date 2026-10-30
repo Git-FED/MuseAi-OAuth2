@@ -457,3 +457,39 @@ push, the deploy must show all 8 bindings + workers.dev on, and the
 rate-limited routes must answer (not 503) before registration runs.
 The www route star (www.fedpromptly.com/login*) is still a separate
 pending dashboard action for the www path.
+
+## Step 9 — Durable Object classes must extend DurableObject (2026-10-30, after the v20 500s)
+
+Root cause, proven by live wrangler tail (not guessed): authorize and
+device-authorization returned 500 because every OAuthRecord RPC threw,
+and the rate limiter was silently degraded at the same time. The tail
+warned, verbatim: "The receiving Durable Object does not support RPC,
+because its class was not declared with `extends DurableObject`."
+Mechanism: step 6 switched migrations to new_sqlite_classes (free plan
+refuses new_classes, error 10097) but the two classes stayed old-style
+(plain constructor(state)). SQLite-class DOs require new-style classes
+to receive RPC. RateLimitBucket.hit failing degraded to allow under
+step 7 (routes kept answering, throttling silently off); OAuthRecord
+calls have no degraded path, so authorize/device/token all 500'd.
+
+Fix (code only, no migration change — the classes are already
+provisioned as SQLite classes): both classes now `extends DurableObject`
+(imported from `cloudflare:workers`), constructor(ctx, env), storage on
+ctx.storage, alarms on ctx.setAlarm. Node tests resolve
+`cloudflare:workers` to tests/cloudflare-workers-shim.mjs via
+package.json imports; wrangler must resolve it to the real runtime
+builtin — post-deploy bundle check: grep the served bundle for
+NODE_TEST_SHIM_MARKER_9X7; if present, the deploy inlined the shim
+and RPC is still broken. After this push, authorize (real client +
+PKCE) must return the approval page (not 500), device-authorization
+must return device_code + user_code, and the tail must show no
+`rate-limit degraded` warnings (throttling back on).
+
+Test-harness note (step 9): plain Node cannot import
+`cloudflare:workers` (ERR_UNSUPPORTED_ESM_URL_SCHEME), and package.json
+"imports" cannot map a colon-scheme specifier. Tests therefore run via
+`node --import ./tests/register-shim.mjs --test` (package.json test
+script): a resolve hook maps `cloudflare:workers` to the dummy class in
+tests/cloudflare-workers-shim.mjs. The hook files live under tests/,
+nothing in worker.js imports them, so they cannot reach the deployed
+bundle. Tests: 51/51 pass with the hook.

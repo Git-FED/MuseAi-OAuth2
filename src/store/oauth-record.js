@@ -15,9 +15,24 @@
 // (e.g. { kind: "auth_code", ... }). Expiry is lazy (checked on every
 // access) plus a Durable Object alarm that cleans up after the deadline.
 
-export class OAuthRecord {
-  constructor(state) {
-    this.storage = state.storage;
+// Step 9 (2026-10-30): Durable Object classes MUST extend DurableObject.
+// The step-6 switch to new_sqlite_classes (free plan refuses new_classes)
+// left these classes old-style (plain constructor(state)), and the live
+// tail proved RPC then fails: "The receiving Durable Object does not
+// support RPC, because its class was not declared with extends
+// DurableObject." That failure is why authorize/device returned 500
+// (store create threw) while the rate limiter only degraded (step 7
+// masks limiter failures as allow). New style: constructor(ctx, env),
+// storage on ctx.storage, alarms on ctx.setAlarm. Node tests resolve
+// `cloudflare:workers` to tests/cloudflare-workers-shim.mjs via
+// package.json imports; wrangler resolves it to the real runtime builtin.
+import { DurableObject } from "cloudflare:workers";
+
+export class OAuthRecord extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.ctx = ctx;
+    this.storage = ctx.storage;
   }
 
   // Create a record that lives for ttlMs. Refuses to overwrite a live
@@ -30,8 +45,8 @@ export class OAuthRecord {
     }
     const stored = { ...record, exp: Date.now() + ttlMs };
     await this.storage.put("record", stored);
-    if (typeof this.storage.setAlarm === "function") {
-      await this.storage.setAlarm(stored.exp);
+    if (typeof this.ctx.setAlarm === "function") {
+      await this.ctx.setAlarm(stored.exp);
     }
     return true;
   }
@@ -63,8 +78,8 @@ export class OAuthRecord {
   async replace(record, ttlMs) {
     const stored = { ...record, exp: Date.now() + ttlMs };
     await this.storage.put("record", stored);
-    if (typeof this.storage.setAlarm === "function") {
-      await this.storage.setAlarm(stored.exp);
+    if (typeof this.ctx.setAlarm === "function") {
+      await this.ctx.setAlarm(stored.exp);
     }
     return true;
   }

@@ -8,9 +8,17 @@
 // the counter — the window does not grant a fresh burst to a client that
 // is already over the limit.
 
-export class RateLimitBucket {
-  constructor(state) {
-    this.storage = state.storage;
+// Step 9 (2026-10-30): see oauth-record.js — new_sqlite_classes
+// requires classes that extend DurableObject, or RPC fails outright.
+// Same fix here: the old-style constructor(state) could not receive
+// hit() calls, which step 7 silently degraded to allow.
+import { DurableObject } from "cloudflare:workers";
+
+export class RateLimitBucket extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.ctx = ctx;
+    this.storage = ctx.storage;
   }
 
   // Returns { allowed, remaining, resetMs }. resetMs is how long until
