@@ -37,3 +37,11 @@ crons = []
 # Set ISSUER only after a custom domain is attached.
 # [vars]
 # ISSUER = "https://login.example.com"
+
+# Mount prefix (build step 5, 2026-10-30): set BASE_PATH when the
+# provider lives under a path of a larger site instead of a domain
+# root. For the fedpromptly deployment: BASE_PATH = "/login" with
+# ISSUER = "https://fedpromptly.com/login". Leave unset for a
+# root-mounted worker. Dashboard variable, never a secret.
+# [vars]
+# BASE_PATH = "/login"

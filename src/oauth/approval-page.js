@@ -26,6 +26,9 @@ function scopeList(scopes) {
 }
 
 function signedPayloadForm({ idField, idValue, approvePath, resultNote }) {
+  // approvePath is built by the caller from BASE_PATH, so the form
+  // posts to the provider's real mount, never a root path that 404s
+  // under a prefix mount.
   return `<form id="approval-form">
 <label for="payload">Muse-signed approval payload (JSON):</label><br>
 <textarea id="payload" name="payload" rows="8" cols="80" placeholder='{"${idField}":"${escapeHtml(idValue)}","muse_id":"...","username":"...","email":"...","signature":"..."}'></textarea><br>
@@ -48,7 +51,7 @@ document.getElementById("approval-form").addEventListener("submit", async (e) =>
 </script>`;
 }
 
-function denyForm({ idField, idValue }) {
+function denyForm({ idField, idValue, basePath = "" }) {
   return `<form id="deny-form">
 <input type="hidden" name="${idField}" value="${escapeHtml(idValue)}">
 <button type="submit">Deny</button>
@@ -58,7 +61,7 @@ function denyForm({ idField, idValue }) {
 document.getElementById("deny-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = JSON.stringify({ "${idField}": "${escapeHtml(idValue)}" });
-  const res = await fetch("/oauth/deny", { method: "POST", headers: { "content-type": "application/json" }, body });
+  const res = await fetch("${basePath}/oauth/deny", { method: "POST", headers: { "content-type": "application/json" }, body });
   const data = await res.json().catch(() => ({}));
   const el = document.getElementById("deny-result");
   if (data.denied && data.redirect_to) { window.location = data.redirect_to; }
@@ -70,7 +73,11 @@ document.getElementById("deny-form").addEventListener("submit", async (e) => {
 
 // Authorize-flow approval page. Shown BEFORE any approval, so the user
 // can see exactly what they are being asked to agree to.
-export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendingId }) {
+// basePath is the provider's mount prefix ("" at root, "/login" on
+// fedpromptly.com): every internal link/form on the page is prefixed
+// with it, so the page works at either mount. Client redirect URIs
+// are never touched — they are not provider URLs.
+export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendingId, basePath = "" }) {
   return pageShell(
     "Sign in with Muse",
     `<h1>Sign in with Muse</h1>
@@ -81,20 +88,20 @@ export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendin
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Pending request: <span id="pending-id">${escapeHtml(pendingId)}</span></p>
-${signedPayloadForm({ idField: "pending_id", idValue: pendingId, approvePath: "/oauth/approval", resultNote: "Approved." })}
-${denyForm({ idField: "pending_id", idValue: pendingId })}`,
+${signedPayloadForm({ idField: "pending_id", idValue: pendingId, approvePath: `${basePath}/oauth/approval`, resultNote: "Approved." })}
+${denyForm({ idField: "pending_id", idValue: pendingId, basePath })}`,
   );
 }
 
 // Device entry page: the blank form a human lands on from a device.
-export function deviceEntryPage(error = null) {
+export function deviceEntryPage(error = null, basePath = "") {
   const banner = error ? `<p><strong>${escapeHtml(error)}</strong></p>` : "";
   return pageShell(
     "Sign in with Muse — enter your code",
     `<h1>Sign in with Muse</h1>
 ${banner}
 <p>Enter the code shown on your device.</p>
-<form method="POST" action="/device">
+<form method="POST" action="${basePath}/device">
 <label for="user_code">Device code:</label><br>
 <input type="text" id="user_code" name="user_code" autocomplete="off" placeholder="ABCD-1234"><br>
 <button type="submit">Continue</button>
@@ -103,7 +110,7 @@ ${banner}
 }
 
 // Device detail page: shown after a valid user code, BEFORE approval.
-export function deviceDetailPage({ clientName, scopes, deviceCode, userCode }) {
+export function deviceDetailPage({ clientName, scopes, deviceCode, userCode, basePath = "" }) {
   return pageShell(
     "Sign in with Muse — approve this device",
     `<h1>Sign in with Muse</h1>
@@ -113,8 +120,8 @@ export function deviceDetailPage({ clientName, scopes, deviceCode, userCode }) {
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Device code: <span id="user-code">${escapeHtml(userCode)}</span></p>
-${signedPayloadForm({ idField: "device_code", idValue: deviceCode, approvePath: "/oauth/approval", resultNote: "Approved. Your device can now finish signing in." })}
-${denyForm({ idField: "device_code", idValue: deviceCode })}`,
+${signedPayloadForm({ idField: "device_code", idValue: deviceCode, approvePath: `${basePath}/oauth/approval`, resultNote: "Approved. Your device can now finish signing in." })}
+${denyForm({ idField: "device_code", idValue: deviceCode, basePath })}`,
   );
 }
 

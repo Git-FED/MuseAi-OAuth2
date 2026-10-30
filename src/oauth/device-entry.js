@@ -17,6 +17,7 @@
 // carry only the generic "invalid_user_code" detail.
 
 import { audit } from "../lib/audit.js";
+import { normalizeBasePath } from "../lib/mount.js";
 import { getClient } from "../lib/registry.js";
 import { recordStub } from "../store/oauth-record.js";
 import { html, json, parseFormOrJson } from "../lib/http.js";
@@ -31,18 +32,19 @@ export function normalizeUserCode(raw) {
   return USER_CODE_RE.test(code) ? code : null;
 }
 
-export async function deviceGetHandler() {
-  return html(deviceEntryPage());
+export async function deviceGetHandler(request, env) {
+  return html(deviceEntryPage(null, normalizeBasePath(env.BASE_PATH)));
 }
 
 export async function devicePostHandler(request, env) {
   const body = await parseFormOrJson(request);
+  const basePath = normalizeBasePath(env.BASE_PATH);
   const wantsJson = (request.headers.get("content-type") || "").includes("application/json");
   const failInvalid = async () => {
     await audit(env, "device_entry_invalid", { actor: null, route: "/device", outcome: "denied", detail: "invalid_user_code" });
     return wantsJson
       ? json({ error: "invalid_user_code", error_description: INVALID_MESSAGE }, 400)
-      : html(deviceEntryPage(INVALID_MESSAGE), 400);
+      : html(deviceEntryPage(INVALID_MESSAGE, basePath), 400);
   };
 
   const code = normalizeUserCode(body && body.user_code);
@@ -94,5 +96,6 @@ export async function devicePostHandler(request, env) {
     scopes: rec.scope,
     deviceCode,
     userCode: code,
+    basePath,
   }));
 }

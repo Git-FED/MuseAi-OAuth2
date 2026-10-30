@@ -6,6 +6,7 @@
 // RATE_LIMIT binding is missing — limits never silently disappear.
 
 import { json } from "./lib/http.js";
+import { normalizeBasePath, stripBasePath } from "./lib/mount.js";
 import { audit } from "./lib/audit.js";
 import { RATE_LIMITS, checkRateLimit } from "./auth/rate-limit.js";
 import { registerClientHandler, registerMuseKeyHandler } from "./admin/register.js";
@@ -42,7 +43,17 @@ const ROUTES = [
 ];
 
 export async function route(request, env) {
-  const path = new URL(request.url).pathname;
+  // Mount prefix (step 5): strip BASE_PATH before matching. A request
+  // that does not start with the configured prefix is not a provider
+  // request at all — 404, never a provider route at the wrong mount.
+  // From here on, `path` is always the STRIPPED path, so route
+  // matching, rate-limit buckets, and audit route values are identical
+  // under either mount.
+  const basePath = normalizeBasePath(env.BASE_PATH);
+  const rawPath = new URL(request.url).pathname;
+  const { matched, stripped } = stripBasePath(rawPath, basePath);
+  if (!matched) return json({ error: "not_found" }, 404);
+  const path = stripped;
   // Match on path AND method: /device serves both GET and POST, and
   // matching on path alone would 405 the second method on a shared path.
   const match = ROUTES.find((r) => r.path === path && r.method === request.method);

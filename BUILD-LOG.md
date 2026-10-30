@@ -278,3 +278,78 @@ oauth-flow + 1 safety + 10 step3 + 8 step4).
   JSON; a direct Muse handoff (no paste) is later polish.
 - His go-ahead + release checklist sign-off: not given. Nothing
   deployed, nothing pushed to GitHub in this step.
+
+## Step 5 — /login path-prefix support (2026-10-30)
+
+Git-FED's call, 2026-10-30: the provider lives at
+https://fedpromptly.com/login (easier for him to make happen than a
+subdomain). ISSUER is therefore https://fedpromptly.com/login, and the
+worker mounts at BASE_PATH=/login. The code previously assumed a root
+mount; this step makes the mount configurable without changing
+root-mounted behavior.
+
+- `src/lib/mount.js` (new) — `normalizeBasePath` (leading slash
+  enforced, trailing slashes stripped, "/" or empty = no prefix) and
+  `stripBasePath` (matches exactly one leading segment: "/login"
+  matches "/login" and "/login/<anything>" and nothing else —
+  "/loginevil", "/loginfoo", and "/LOGIN/..." do not match). A
+  request that does not start with the prefix is not a provider
+  request: the router answers 404, never a provider route at the
+  wrong mount. "/login/" strips to "/" — the mount root, which is
+  not a route, so it 404s like any unknown path.
+- `src/router.js` — strips BASE_PATH before matching; from there on
+  the stripped path is used for route matching, 405 detection, the
+  kill-switch health exception, rate-limit buckets, and audit route
+  values, so behavior is identical under either mount.
+- `src/oauth/approval-page.js` — every internal link on the human
+  pages is built from basePath: approval fetch
+  `${basePath}/oauth/approval`, deny fetch `${basePath}/oauth/deny`,
+  device entry form action `${basePath}/device`. Client redirect URIs
+  are never touched — they are not provider URLs.
+- `src/oauth/authorize.js`, `src/oauth/device-entry.js` — pass
+  normalizeBasePath(env.BASE_PATH) into the page renderers.
+- `wrangler.toml` — BASE_PATH documented as a commented dashboard
+  variable alongside ISSUER (not set in the repo).
+- `docs/DEPLOY.md` — ISSUER is now https://fedpromptly.com/login,
+  BASE_PATH=/login for the fedpromptly deployment; the Cloudflare
+  route to create is fedpromptly.com/login* (a dashboard action by
+  the owner, NOT done); runtime-proof steps and the release checklist
+  now use /login-prefixed paths; root mounting still works with
+  BASE_PATH unset.
+- No code change needed for discovery or the device verification_uri:
+  both already derive from env ISSUER, so with ISSUER set to
+  https://fedpromptly.com/login they sit under /login automatically
+  (verified by test, not assumed).
+
+**Tests: 47/47 passing under plain node** (8 atomic-store + 12
+oauth-flow + 1 safety + 10 step3 + 8 step4 + 8 step5).
+- `tests/step5.test.mjs` — 8 new tests: full authorize flow end to
+  end through prefixed URLs (approval redirect_to still points at the
+  client's registered callback, unrewritten); root-path requests 404
+  when a prefix is set, mount root 404s, wrong method under the
+  prefix is still 405, prefixed health answers; discovery returns
+  issuer https://fedpromptly.com/login with every endpoint under
+  /login; device verification_uri sits under /login and the entry
+  page posts there; prefix-confusion paths never match; prefixed
+  pages carry prefixed internal links and no root provider links;
+  rate limits still fire under the prefix (61st authorize per IP
+  → 429); BASE_PATH unset leaves previous root behavior unchanged.
+- One test-side fix during this step (not a code fix): the device
+  detail page has no entry form, so the form-action assertion was
+  moved to the blank entry form where it belongs; the detail page
+  asserts its prefixed approval/deny fetches instead.
+
+**Still gaps, declared honestly:**
+- Runtime proof: tests run under node, not the Cloudflare runtime.
+  `wrangler dev` or a deployed worker is still what proves both DO
+  bindings, and neither has happened. docs/DEPLOY.md lists the exact
+  proof steps, now with /login paths.
+- The fedpromptly.com/login* route itself: his dashboard action,
+  not done.
+- ADMIN_TOKEN and ES256 signing keys: unset anywhere.
+- Registry population: no client or Muse key records exist until the
+  admin action.
+- Approval UX beyond this step: the signed payload is still pasted
+  JSON; a direct Muse handoff (no paste) is later polish.
+- His go-ahead + release checklist sign-off: not given. Nothing
+  deployed, nothing pushed to GitHub in this step.

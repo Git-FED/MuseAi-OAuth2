@@ -1,4 +1,4 @@
-# Deploy prep — Login with Muse worker (build step 4, 2026-10-30)
+# Deploy prep — Login with Muse worker (build step 5, 2026-10-30)
 
 This document is a release checklist, not a release. It is honest about
 what is code-done versus what still needs a human action. **Nothing in
@@ -19,19 +19,29 @@ Entry point: `worker.js` (delegates to `src/index.js` → `src/router.js`).
 Tests: `node --test` (plain node, no Cloudflare runtime — see
 "Runtime proof" below; node tests prove logic, not the deployment).
 
-## Decisions still open (owner's call, not set here)
+## Decisions decided (owner's call, 2026-10-30)
 
-- [ ] **Custom domain + ISSUER.** `wrangler.toml` has `workers_dev =
-  false` and the `ISSUER` var commented out. Discovery
-  (`/.well-known/openid-configuration`), JWKS (`/jwks`), token
-  issuance, and the device `verification_uri` all derive from `ISSUER`.
-  Until a domain is attached and `ISSUER` is set to it (dashboard
-  variable, e.g. `https://login.example.com` — replace with the real
-  domain), discovery and JWKS answer 503 by design. **No domain is
-  chosen in this repo. Do not invent one.**
+- [x] **Provider home: https://fedpromptly.com/login.** The provider
+  lives under a path of his own domain, not a subdomain and not a
+  workers.dev URL. `ISSUER` is therefore
+  `https://fedpromptly.com/login`, and the worker mounts at
+  `BASE_PATH=/login` (build step 5: the router strips exactly that
+  one leading segment before matching; root mounting still works with
+  `BASE_PATH` unset). Discovery lives at
+  `https://fedpromptly.com/login/.well-known/openid-configuration`
+  and every endpoint URL in it sits under `/login`. Until `ISSUER`
+  and `BASE_PATH` are set as dashboard variables, discovery and JWKS
+  answer 503 by design.
+- [ ] **Cloudflare route — HIS dashboard action, NOT done.** Create
+  the route `fedpromptly.com/login*` pointing at this worker, so
+  requests under `/login` reach it and everything else on
+  fedpromptly.com is untouched. Nothing in this repo creates that
+  route; it is a dashboard action by the owner.
 - [ ] **First clients.** Which of his own sites become the first
   registered clients, and their exact redirect URIs. Registration is
-  via the admin endpoints (below), never by editing code.
+  via the admin endpoints (below), never by editing code. (The
+  button question — which sites get the login button first — comes
+  after deploy; his own sites are first clients either way.)
 
 ## Secrets — dashboard only, never in code or in this repo
 
@@ -51,7 +61,10 @@ before any deploy. If any one is missing, the worker fails closed
   (`generateKey({ name: "ECDSA", namedCurve: "P-256" })`, export both
   halves as JWK), keep the private half secret, publish the public
   half. **No key pair exists yet. Do not ship a test key.**
-- [ ] `ISSUER` — dashboard variable, once the domain is chosen (above).
+- [ ] `ISSUER` — dashboard variable:
+  `https://fedpromptly.com/login` (decided 2026-10-30).
+- [ ] `BASE_PATH` — dashboard variable: `/login` (decided 2026-10-30;
+  step 5 mount support). Leave unset only for a root-mounted worker.
 
 ## Bindings — already declared in wrangler.toml, verify at deploy
 
@@ -103,21 +116,25 @@ announcement:
 
 - [ ] `npx wrangler dev` (local dev against real bindings, or a
   staging worker — never production first).
-- [ ] `GET /health` → `{"ok":true}`.
-- [ ] Full authorize flow: `GET /oauth/authorize` (page shows client
-  name, redirect host, scopes, email statement) → signed approval via
-  `POST /oauth/approval` → code → `POST /oauth/token` → tokens →
-  `GET /oauth/userinfo` (email + `email_verified: false`).
-- [ ] Full device flow: `POST /oauth/device-authorization` →
-  `GET /device` + `POST /device` with the user code (page shows client
-  + scopes) → signed approval → polling `POST /oauth/token` issues
-  tokens; a denied device polls to `access_denied`.
+- [ ] `GET /login/health` → `{"ok":true}` (root `/health` 404s under
+  the `/login` mount — that is correct, not a failure).
+- [ ] Full authorize flow: `GET /login/oauth/authorize` (page shows
+  client name, redirect host, scopes, email statement) → signed
+  approval via `POST /login/oauth/approval` → code →
+  `POST /login/oauth/token` → tokens →
+  `GET /login/oauth/userinfo` (email + `email_verified: false`).
+- [ ] Full device flow: `POST /login/oauth/device-authorization`
+  (verification_uri must read
+  `https://fedpromptly.com/login/device`) → `GET /login/device` +
+  `POST /login/device` with the user code (page shows client +
+  scopes) → signed approval → polling `POST /login/oauth/token`
+  issues tokens; a denied device polls to `access_denied`.
 - [ ] Rate limits fire: 61st authorize per IP per minute → 429 with
   Retry-After; missing `RATE_LIMIT` binding → 503 (test on staging by
   removing the binding, then restore it).
 - [ ] Deny paths: authorize deny redirects the client with
   `error=access_denied`; device deny polls to `access_denied`.
-- [ ] Kill switch (below) actually pauses logins while `/health`
+- [ ] Kill switch (below) actually pauses logins while `/login/health`
   still answers.
 
 ## Kill switch — the pause button
@@ -145,7 +162,9 @@ announcement:
 
 ## Release checklist — all boxes must be checked, then his go-ahead
 
-- [ ] Custom domain attached; `ISSUER` set to it.
+- [ ] Cloudflare route `fedpromptly.com/login*` created (his
+  dashboard action); `ISSUER` set to
+  `https://fedpromptly.com/login`, `BASE_PATH` set to `/login`.
 - [ ] `ADMIN_TOKEN`, `SIGNING_KEY_JWK`, `SIGNING_PUBLIC_JWK` set as
   dashboard secrets/variables. No test keys.
 - [ ] All three bindings verified live (OAUTH_KV, OAUTH_STORE,
@@ -162,9 +181,12 @@ announcement:
 ## Still not done, stated plainly
 
 - Runtime proof on Cloudflare (above) — node tests only, so far.
-- Domain + ISSUER choice — his call.
+- The `fedpromptly.com/login*` route itself — his dashboard action.
 - `ADMIN_TOKEN` and signing keys — unset anywhere.
 - Registry population — zero records exist until the admin action.
 - Approval-page UX beyond this step: the signed payload is still
   pasted JSON; a direct Muse handoff (no paste) is a later polish.
 - His go-ahead + release checklist sign-off — not given.
+
+Domain + ISSUER are decided (`https://fedpromptly.com/login`,
+`BASE_PATH=/login`, 2026-10-30) — that box is no longer open.

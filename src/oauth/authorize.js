@@ -9,6 +9,7 @@
 // anywhere on it.
 
 import { randomString } from "../lib/crypto.js";
+import { normalizeBasePath } from "../lib/mount.js";
 import { getClient } from "../lib/registry.js";
 import { isValidClientId, parseScope, redirectHost } from "../lib/validate.js";
 import { recordStub } from "../store/oauth-record.js";
@@ -80,5 +81,6 @@ export async function authorizeHandler(request, env) {
     redirectHost: host,
     scopes: scope,
     pendingId,
+    basePath: normalizeBasePath(env.BASE_PATH),
   }));
 }
