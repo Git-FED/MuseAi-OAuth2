@@ -1,25 +1,10 @@
-// Validation against the KV client registry. Redirect URIs are matched
-// exactly — no prefix, wildcard, or localhost exception anywhere.
+// Validation helpers. Client registry reads live in src/lib/registry.js
+// (strict shape checks on read); this module holds id/scope/URI helpers.
 
 export const ALLOWED_SCOPES = new Set(["openid", "profile", "email", "offline_access"]);
 
 export function isValidClientId(id) {
   return typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id);
-}
-
-// Client registry lives in KV: client:<client_id> -> { client_id, name, redirect_uris }.
-// Returns null when unregistered or malformed. Registries are data, never
-// consumable records, so KV is the right home for them.
-export async function getClient(env, clientId) {
-  const raw = await env.OAUTH_KV.get(`client:${clientId}`);
-  if (!raw) return null;
-  try {
-    const client = JSON.parse(raw);
-    if (client.client_id !== clientId || !Array.isArray(client.redirect_uris)) return null;
-    return client;
-  } catch {
-    return null;
-  }
 }
 
 export function validateRedirectUri(client, uri) {

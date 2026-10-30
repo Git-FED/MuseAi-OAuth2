@@ -23,7 +23,9 @@ test("live worker: health ok, unknown route 404, unconfigured discovery 503", as
     new Request("https://example.invalid/oauth/authorize?client_id=x&redirect_uri=https://example.invalid/cb&response_type=code&code_challenge=c&code_challenge_method=S256"),
     {},
   );
-  // No OAUTH_KV in this env at all: the handler throws, the router
-  // answers 500 rather than serving anything permissive.
-  assert.equal(authorize.status, 500);
+  // No RATE_LIMIT binding in this env at all: the rate limiter fails
+  // closed with 503 before the handler runs — limits never silently
+  // disappear, and nothing permissive is served.
+  assert.equal(authorize.status, 503);
+  assert.equal((await authorize.json()).error, "temporarily_unavailable");
 });

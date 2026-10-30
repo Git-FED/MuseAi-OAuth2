@@ -6,7 +6,8 @@
 // username or email field anywhere on it.
 
 import { randomString } from "../lib/crypto.js";
-import { getClient, isValidClientId, parseScope, redirectHost } from "../lib/validate.js";
+import { getClient } from "../lib/registry.js";
+import { isValidClientId, parseScope, redirectHost } from "../lib/validate.js";
 import { recordStub } from "../store/oauth-record.js";
 import { html, json } from "../lib/http.js";
 
@@ -53,6 +54,10 @@ export async function authorizeHandler(request, env) {
   }
   const scope = parseScope(q.get("scope"));
   if (!scope) return redirectWithError(redirectUri, "invalid_scope", state);
+  // Per-client scope restriction, when the client record restricts scopes.
+  if (client.allowed_scopes && !scope.every((s) => client.allowed_scopes.includes(s))) {
+    return redirectWithError(redirectUri, "invalid_scope", state);
+  }
 
   const pendingId = randomString(24);
   try {

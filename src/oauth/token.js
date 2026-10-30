@@ -6,7 +6,9 @@
 // be registered and must match the record being redeemed.
 
 import { verifyPkce } from "../lib/crypto.js";
-import { getClient, isValidClientId } from "../lib/validate.js";
+import { audit } from "../lib/audit.js";
+import { getClient } from "../lib/registry.js";
+import { isValidClientId } from "../lib/validate.js";
 import { recordStub } from "../store/oauth-record.js";
 import { issueTokenPair, requireTokenConfig, rotateRefresh } from "../auth/tokens.js";
 import { json, parseFormOrJson } from "../lib/http.js";
@@ -33,16 +35,16 @@ export async function tokenHandler(request, env) {
     if (!(await verifyPkce(code_verifier, rec.code_challenge))) {
       return json({ error: "invalid_grant" }, 400);
     }
-    return json(
-      await issueTokenPair(env, {
-        sub: `muse:${rec.muse_id}`,
-        username: rec.username,
-        email: rec.email,
-        clientId,
-        scope: rec.scope,
-        nonce: rec.nonce,
-      }),
-    );
+    const pair = await issueTokenPair(env, {
+      sub: `muse:${rec.muse_id}`,
+      username: rec.username,
+      email: rec.email,
+      clientId,
+      scope: rec.scope,
+      nonce: rec.nonce,
+    });
+    await audit(env, "token_issued", { actor: `muse:${rec.muse_id}`, clientId, route: "/oauth/token", outcome: "success", detail: "authorization_code" });
+    return json(pair);
   }
 
   if (grant === "refresh_token") {
@@ -52,6 +54,7 @@ export async function tokenHandler(request, env) {
     if (!existing || existing.client_id !== clientId) return json({ error: "invalid_grant" }, 400);
     const pair = await rotateRefresh(env, old);
     if (!pair) return json({ error: "invalid_grant" }, 400);
+    await audit(env, "token_issued", { actor: existing.sub, clientId, route: "/oauth/token", outcome: "success", detail: "refresh_token" });
     return json(pair);
   }
 
@@ -65,16 +68,16 @@ export async function tokenHandler(request, env) {
     if (rec.status === "pending") return json({ error: "authorization_pending" }, 400);
     if (rec.status !== "approved") return json({ error: "invalid_grant" }, 400);
     await stub.consume();
-    return json(
-      await issueTokenPair(env, {
-        sub: `muse:${rec.muse_id}`,
-        username: rec.username,
-        email: rec.email,
-        clientId,
-        scope: rec.scope,
-        nonce: null,
-      }),
-    );
+    const devicePair = await issueTokenPair(env, {
+      sub: `muse:${rec.muse_id}`,
+      username: rec.username,
+      email: rec.email,
+      clientId,
+      scope: rec.scope,
+      nonce: null,
+    });
+    await audit(env, "token_issued", { actor: `muse:${rec.muse_id}`, clientId, route: "/oauth/token", outcome: "success", detail: "device_code" });
+    return json(devicePair);
   }
 
   return json({ error: "unsupported_grant_type" }, 400);

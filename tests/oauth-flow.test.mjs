@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../worker.js";
 import { OAuthRecord } from "../src/store/oauth-record.js";
+import { RateLimitBucket } from "../src/store/rate-limit.js";
 import { pkceChallenge } from "../src/lib/crypto.js";
 
 function fakeStorage() {
@@ -29,6 +30,17 @@ function fakeStore() {
   };
 }
 
+function fakeRateLimit() {
+  const instances = new Map();
+  return {
+    idFromName: (k) => k,
+    get: (id) => {
+      if (!instances.has(id)) instances.set(id, new RateLimitBucket({ storage: fakeStorage() }));
+      return instances.get(id);
+    },
+  };
+}
+
 function fakeKV() {
   const m = new Map();
   return {
@@ -46,6 +58,7 @@ async function makeEnv({ issuer = "https://login.example.com" } = {}) {
   const env = {
     OAUTH_STORE: fakeStore(),
     OAUTH_KV: kv,
+    RATE_LIMIT: fakeRateLimit(),
     ISSUER: issuer,
     SIGNING_KEY_JWK: JSON.stringify(signing),
     SIGNING_PUBLIC_JWK: JSON.stringify(pub),

@@ -16,9 +16,19 @@ id = "3d87785008fb439990fb9dde9490c152"
 name = "OAUTH_STORE"
 class_name = "OAuthRecord"
 
+# Rate-limit counters (build step 3, 2026-10-30): one RateLimitBucket
+# instance per bucket key. See src/store/rate-limit.js.
+[[durable_objects.bindings]]
+name = "RATE_LIMIT"
+class_name = "RateLimitBucket"
+
 [[migrations]]
 tag = "v1"
 new_classes = ["OAuthRecord"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["RateLimitBucket"]
 
 # This is not signing-key rotation. See docs/KEY-ROTATION.md before enabling.
 [triggers]

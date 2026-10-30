@@ -6,7 +6,8 @@
 // approval currently references the device code directly.
 
 import { randomString, randomUserCode } from "../lib/crypto.js";
-import { getClient, isValidClientId, parseScope } from "../lib/validate.js";
+import { getClient } from "../lib/registry.js";
+import { isValidClientId, parseScope } from "../lib/validate.js";
 import { recordStub } from "../store/oauth-record.js";
 import { json, parseFormOrJson } from "../lib/http.js";
 
@@ -19,6 +20,10 @@ export async function deviceAuthorizationHandler(request, env) {
   if (!client) return json({ error: "invalid_client" }, 400);
   const scope = parseScope(body.scope);
   if (!scope) return json({ error: "invalid_scope" }, 400);
+  // Per-client scope restriction, when the client record restricts scopes.
+  if (client.allowed_scopes && !scope.every((s) => client.allowed_scopes.includes(s))) {
+    return json({ error: "invalid_scope" }, 400);
+  }
 
   const deviceCode = randomString(32);
   const userCode = randomUserCode();

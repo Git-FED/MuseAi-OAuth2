@@ -5,6 +5,7 @@
 // a missing token parameter is the only 400.
 
 import { decodeJwtPayload } from "../lib/crypto.js";
+import { audit } from "../lib/audit.js";
 import { recordStub } from "../store/oauth-record.js";
 import { json, parseFormOrJson } from "../lib/http.js";
 
@@ -21,5 +22,6 @@ export async function revocationHandler(request, env) {
       await env.OAUTH_KV.put(`revoked_access:${payload.jti}`, "1");
     }
   }
+  await audit(env, "token_revoked", { route: "/oauth/revoke", outcome: "success", detail: hint || "token" });
   return new Response(null, { status: 200, headers: { "cache-control": "no-store" } });
 }

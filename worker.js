@@ -6,5 +6,6 @@
 import index from "./src/index.js";
 
 export { OAuthRecord } from "./src/store/oauth-record.js";
+export { RateLimitBucket } from "./src/store/rate-limit.js";
 
 export default index;
