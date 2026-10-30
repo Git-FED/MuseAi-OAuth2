@@ -1,0 +1,29 @@
+name = "museai-oauth"
+main = "worker.js"
+compatibility_date = "2026-10-28"
+workers_dev = false
+
+# KV is for non-atomic data only. One-time codes, device codes, pending
+# approvals, and refresh tokens live in the Durable Object below — KV
+# cannot consume a record exactly once.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "3d87785008fb439990fb9dde9490c152"
+
+# Atomic store (build step 1, 2026-10-30): one OAuthRecord instance per
+# one-time record. See src/store/oauth-record.js.
+[[durable_objects.bindings]]
+name = "OAUTH_STORE"
+class_name = "OAuthRecord"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["OAuthRecord"]
+
+# This is not signing-key rotation. See docs/KEY-ROTATION.md before enabling.
+[triggers]
+crons = []
+
+# Set ISSUER only after a custom domain is attached.
+# [vars]
+# ISSUER = "https://login.example.com"

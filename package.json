@@ -1,0 +1,13 @@
+{
+  "name": "museai-oauth-scaffold",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check worker.js && node --check site/assets/museai-login.js"
+  }
+}
