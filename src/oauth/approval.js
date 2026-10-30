@@ -68,6 +68,10 @@ export async function approvalHandler(request, env) {
   }
   auditClientId = rec.client_id || null;
   if (rec.status === "approved") return fail(400, "already_approved", "already_approved");
+  // Denied is terminal: a denied request can never be approved later.
+  // The denial itself was audited by POST /oauth/deny; this is the
+  // denial surfacing to a late approval attempt.
+  if (rec.status === "denied") return fail(400, "access_denied", "access_denied", "this request was denied");
 
   // Strict reader: missing OR malformed key records both read as null.
   const keyRec = await getMuseKey(env, muse_id);

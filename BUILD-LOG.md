@@ -176,3 +176,105 @@ public key, so "it imports" proves shape, never ownership.
   `wrangler dev` or a deployed worker is still what proves both DO
   bindings, and neither has happened. Nothing deployed, nothing pushed
   to GitHub in this step.
+
+## Step 4 — Approval-page polish, device user-code entry page, deploy prep (2026-10-30)
+
+**Built:**
+- `src/oauth/approval-page.js` — shared HTML renderer for the human
+  surfaces. Everything registry- or request-sourced is escaped before
+  it reaches a page; error pages use plain language, never a stack
+  trace or internal detail.
+- Authorize approval page (via `src/oauth/authorize.js`, inline page
+  replaced): before any approval it now shows the client name, the
+  exact redirect host, the scopes being requested, and the option-2
+  email statement ("signing in will share your email address...
+  returned as unverified (email_verified: false). Verification is a
+  later, separate step and never blocks your sign-in"), plus a DENY
+  button next to Approve. Still no typed username or email field:
+  approval is the signed payload only.
+- `src/oauth/deny.js` — POST /oauth/deny, the clean deny path for
+  both flows. Denial is terminal: the record's status becomes
+  "denied" (never usable again, expires with its normal TTL, nothing
+  left "awaiting"). A later approval attempt on the same id answers
+  access_denied; a polling device answers access_denied (token
+  handler updated for this). Authorize deny returns a redirect_to
+  carrying error=access_denied (+ state) so the client sees a standard
+  OAuth denial. Denying an already-approved request is refused
+  (revocation is the path for that); denying an already-denied
+  request is idempotent. Every denial is audited (approval_denied,
+  detail denied_by_user / device_denied_by_user).
+- `src/oauth/approval.js` — a denied record now answers access_denied
+  on a late approval attempt (previously it would have fallen through
+  to signature verification against a dead request).
+- `src/oauth/token.js` — a denied device polls to access_denied
+  (audited as token_denied), repeatedly until TTL expiry, instead of
+  the generic invalid_grant.
+- `src/oauth/device-entry.js` + routes GET/POST /device — the human
+  user-code entry page (RFC 8628 verification URI). GET serves a blank
+  code form; POST resolves the code, then shows the client name +
+  scopes + approve/deny forms for a pending request, or a plain
+  already-approved / denied page. Wrong, malformed, or expired codes
+  get one generic message ("invalid or has expired") that does not
+  say whether the code ever existed, and the submitted code value is
+  never logged or audited (invalid attempts audit as
+  device_entry_invalid with the generic detail only). Approval from
+  the device page uses the SAME Muse-signed mechanism as the
+  authorize flow — no second authentication mechanism was invented.
+- `src/oauth/device-authorization.js` — writes the KV index
+  device_user_code:<CODE> -> device_code (30-minute TTL, matching the
+  device record) because the DO store is keyed by device code and has
+  no scan. If the index write fails, the device record is revoked and
+  the request fails closed rather than handing out a code no human
+  can enter. verification_uri now points at /device (it previously
+  pointed at the JSON /oauth/approval endpoint, which was never a
+  human page).
+- `src/router.js` — /oauth/deny, GET /device, POST /device added.
+  Route matching fixed to match path AND method: /device serves both
+  GET and POST, and matching on path alone would have 405'd the
+  second method on the shared path. Existing 404/405 behavior
+  unchanged (verified by the existing tests).
+- `src/auth/rate-limit.js` — /oauth/deny: 30/IP/min + 10 per
+  pending/device id per 10 min (same shape as approval, so deny can't
+  be hammered either). /device: 30/IP/min — the guessing brake for
+  short user codes.
+- `docs/DEPLOY.md` — release checklist that separates code-done from
+  human-action: custom domain + ISSUER (wrangler.toml still has
+  workers_dev=false and ISSUER commented out — the domain is his
+  call, none chosen here), ADMIN_TOKEN + ES256 signing keys as
+  dashboard secrets, the three bindings with migrations v1/v2,
+  registry population via the admin endpoints (reviewed human
+  action), wrangler-dev runtime-proof steps (still not done),
+  KILL_SWITCH procedure, rollback (fail-closed, redeploy previous
+  git version), and a release checklist ending in his explicit
+  go-ahead. No domain set, no secrets invented, no deploy step
+  claimed done.
+
+**Tests: 39/39 passing under plain node** (8 atomic-store + 12
+oauth-flow + 1 safety + 10 step3 + 8 step4).
+- `tests/step4.test.mjs` — 8 new tests: approval page shows client +
+  redirect host + scopes + email statement with no typed
+  username/email field; deny fails the pending request and later
+  approval answers access_denied (plus idempotent re-deny and unknown
+  id behavior); device entry GET form + valid-code detail page;
+  device approve (signed) issues tokens; device deny polls to
+  access_denied repeatedly; wrong/malformed/expired codes error
+  cleanly with one generic message (expired simulated with a 1ms-TTL
+  record); device submissions rate-limited per IP; approve/deny
+  outcomes audited with no device material in the audit trail.
+- Existing tests updated, not weakened: none needed changes — the
+  device flow test still passes with the new verification_uri, and
+  the 404/405 test still passes with the new router matching.
+
+**Still gaps, declared honestly:**
+- Runtime proof: tests run under node, not the Cloudflare runtime.
+  `wrangler dev` or a deployed worker is still what proves both DO
+  bindings, and neither has happened. docs/DEPLOY.md lists the exact
+  proof steps.
+- Domain + ISSUER: not chosen (his call).
+- ADMIN_TOKEN and ES256 signing keys: unset anywhere.
+- Registry population: no client or Muse key records exist until the
+  admin action.
+- Approval UX beyond this step: the signed payload is still pasted
+  JSON; a direct Muse handoff (no paste) is later polish.
+- His go-ahead + release checklist sign-off: not given. Nothing
+  deployed, nothing pushed to GitHub in this step.

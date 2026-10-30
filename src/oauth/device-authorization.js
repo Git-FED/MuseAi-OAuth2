@@ -2,8 +2,15 @@
 // in the Durable Object store (TTL 30 minutes, status pending). The
 // device polls /oauth/token until the request is approved via
 // /oauth/approval with a Muse-signed payload referencing the device code.
-// Note: a human-facing user-code entry page is not built in this step;
-// approval currently references the device code directly.
+//
+// The Durable Object store is keyed by device code and has no scan, so
+// a KV index maps the human user code to the device code
+// (device_user_code:<CODE> -> device_code, same 30-minute TTL). The index
+// is data, never a consumable record — the device record itself stays
+// the single source of truth for status. If the index write fails, the
+// device record is revoked and the request fails closed: a device code
+// whose user code no human can enter is a broken flow, not a live one.
+// The verification URI is the human page GET /device.
 
 import { randomString, randomUserCode } from "../lib/crypto.js";
 import { getClient } from "../lib/registry.js";
@@ -27,7 +34,8 @@ export async function deviceAuthorizationHandler(request, env) {
 
   const deviceCode = randomString(32);
   const userCode = randomUserCode();
-  await recordStub(env, `device:${deviceCode}`).create(
+  const stub = recordStub(env, `device:${deviceCode}`);
+  await stub.create(
     {
       kind: "device",
       device_code: deviceCode,
@@ -38,10 +46,19 @@ export async function deviceAuthorizationHandler(request, env) {
     },
     1_800_000,
   );
+  // Index the user code so POST /device can resolve it. Fail closed on
+  // index failure: revoke the device record rather than hand out a code
+  // no human can enter.
+  try {
+    await env.OAUTH_KV.put(`device_user_code:${userCode}`, deviceCode, { expirationTtl: 1800 });
+  } catch {
+    await stub.revoke();
+    return json({ error: "server_error" }, 500);
+  }
   return json({
     device_code: deviceCode,
     user_code: userCode,
-    verification_uri: env.ISSUER ? `${env.ISSUER.replace(/\/$/, "")}/oauth/approval` : "/oauth/approval",
+    verification_uri: env.ISSUER ? `${env.ISSUER.replace(/\/$/, "")}/device` : "/device",
     expires_in: 1800,
     interval: 5,
   });

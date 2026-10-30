@@ -13,6 +13,8 @@ import { authorizeHandler } from "./oauth/authorize.js";
 import { tokenHandler } from "./oauth/token.js";
 import { userinfoHandler } from "./oauth/userinfo.js";
 import { approvalHandler } from "./oauth/approval.js";
+import { denyHandler } from "./oauth/deny.js";
+import { deviceGetHandler, devicePostHandler } from "./oauth/device-entry.js";
 import { deviceAuthorizationHandler } from "./oauth/device-authorization.js";
 import { revocationHandler } from "./oauth/revocation.js";
 import { discoveryHandler } from "./oauth/discovery.js";
@@ -30,6 +32,9 @@ const ROUTES = [
   { method: "POST", path: "/oauth/token", handler: tokenHandler },
   { method: "GET", path: "/oauth/userinfo", handler: userinfoHandler },
   { method: "POST", path: "/oauth/approval", handler: approvalHandler },
+  { method: "POST", path: "/oauth/deny", handler: denyHandler },
+  { method: "GET", path: "/device", handler: deviceGetHandler },
+  { method: "POST", path: "/device", handler: devicePostHandler },
   { method: "POST", path: "/oauth/device-authorization", handler: deviceAuthorizationHandler },
   { method: "POST", path: "/oauth/revoke", handler: revocationHandler },
   { method: "POST", path: "/admin/clients", handler: registerClientHandler },
@@ -38,9 +43,14 @@ const ROUTES = [
 
 export async function route(request, env) {
   const path = new URL(request.url).pathname;
-  const match = ROUTES.find((r) => r.path === path);
-  if (!match) return json({ error: "not_found" }, 404);
-  if (request.method !== match.method) return json({ error: "method_not_allowed" }, 405);
+  // Match on path AND method: /device serves both GET and POST, and
+  // matching on path alone would 405 the second method on a shared path.
+  const match = ROUTES.find((r) => r.path === path && r.method === request.method);
+  if (!match) {
+    return ROUTES.some((r) => r.path === path)
+      ? json({ error: "method_not_allowed" }, 405)
+      : json({ error: "not_found" }, 404);
+  }
   if (path !== "/health" && env.KILL_SWITCH === "1") {
     return json({ error: "temporarily_unavailable" }, 503);
   }

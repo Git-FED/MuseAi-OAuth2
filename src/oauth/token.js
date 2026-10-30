@@ -66,6 +66,13 @@ export async function tokenHandler(request, env) {
     if (!rec) return json({ error: "invalid_grant" }, 400);
     if (rec.client_id !== clientId) return json({ error: "invalid_grant" }, 400);
     if (rec.status === "pending") return json({ error: "authorization_pending" }, 400);
+    if (rec.status === "denied") {
+      // Terminal: the user denied this device. The denial was audited at
+      // deny time; the poll surfacing it is audited too, so a denied
+      // device leaves a complete trail.
+      await audit(env, "token_denied", { actor: null, clientId, route: "/oauth/token", outcome: "denied", detail: "device_code" });
+      return json({ error: "access_denied" }, 400);
+    }
     if (rec.status !== "approved") return json({ error: "invalid_grant" }, 400);
     await stub.consume();
     const devicePair = await issueTokenPair(env, {

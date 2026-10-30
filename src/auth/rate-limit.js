@@ -20,6 +20,13 @@ export const RATE_LIMITS = {
   "/oauth/authorize": { ip: 60, client: 300, windowMs: 60_000 },
   "/oauth/token": { ip: 120, client: 600, windowMs: 60_000 },
   "/oauth/approval": { ip: 30, pending: 10, pendingWindowMs: 600_000, windowMs: 60_000 },
+  // Deny shares the approval shape: an IP bucket plus a per-request
+  // bucket (the pending/device bucket reader already reads pending_id
+  // or device_code from the body), so deny cannot be hammered either.
+  "/oauth/deny": { ip: 30, pending: 10, pendingWindowMs: 600_000, windowMs: 60_000 },
+  // Device entry: user codes are short by design (RFC 8628), so the IP
+  // bucket is the guessing brake — 30 submissions per IP per minute.
+  "/device": { ip: 30, windowMs: 60_000 },
   "/oauth/device-authorization": { ip: 30, client: 120, windowMs: 60_000 },
   "/admin/clients": { ip: 10, windowMs: 60_000 },
   "/admin/muse-keys": { ip: 10, windowMs: 60_000 },
