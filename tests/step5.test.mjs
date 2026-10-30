@@ -144,12 +144,18 @@ test("full authorize flow works end to end through prefixed URLs", async () => {
   assert.equal(me.data.email_verified, false);
 });
 
-test("root-path requests 404 when a prefix is set, and the mount root 404s too", async () => {
+test("root-path requests 404 when a prefix is set; the mount root serves the login page (step 10)", async () => {
   const env = await makeEnv({ basePath: "/login" });
-  for (const path of ["/oauth/authorize", "/health", "/device", "/.well-known/openid-configuration", "/login/", "/login"]) {
+  for (const path of ["/oauth/authorize", "/health", "/device", "/.well-known/openid-configuration"]) {
     const res = await call(env, "GET", path);
     assert.equal(res.status, 404, `${path} -> ${res.status}`);
     assert.equal(res.data.error, "not_found");
+  }
+  // Step 10: the mount root is the login page, not a 404.
+  for (const path of ["/login/", "/login"]) {
+    const res = await call(env, "GET", path);
+    assert.equal(res.status, 200, `${path} -> ${res.status}`);
+    assert.ok(res.text.includes('id="muse-login-btn"'));
   }
   // Wrong method under the prefix is still 405, not 404.
   const wrong = await call(env, "POST", "/login/oauth/authorize");

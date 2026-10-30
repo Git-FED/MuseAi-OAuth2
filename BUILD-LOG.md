@@ -493,3 +493,47 @@ script): a resolve hook maps `cloudflare:workers` to the dummy class in
 tests/cloudflare-workers-shim.mjs. The hook files live under tests/,
 nothing in worker.js imports them, so they cannot reach the deployed
 bundle. Tests: 51/51 pass with the hook.
+
+## Step 10 — worker-hosted Sign in with Muse page at the mount root (2026-10-30, Git-FED order: "a working embed")
+
+Problem: the step-9 button was a snippet file. Git-FED's site is Google
+Sites, which cannot run that snippet (no page to host the button +
+callback), so the snippet was unusable there. He deployed it to GitHub
+Pages (test1) as a workaround, but the registered redirect still points
+at the Google Sites homepage, so the auth code lands where no callback
+code runs and is never redeemed.
+
+Fix (code only): GET / after BASE_PATH stripping — i.e. /login on www,
+previously a 404 by design — now serves the login page itself
+(src/oauth/login-page.js, route added to src/router.js). The page is
+the embed: a site embeds it by URL or iframe and the whole flow
+(button, approval, callback, email display) happens on the page, same
+origin throughout. The page derives its API base and redirect_uri from
+its own URL (origin + path, trailing slash stripped), so it works on
+any host it is served from — but that exact URL must be a registered
+redirect_uri for client fedpromptly. No framing-blocking headers exist
+anywhere in this worker (lib/http.js sets only no-store + nosniff), and
+the page never navigates the top frame, so it stays usable inside an
+embed. Google Sites needs only a plain link or iframe to the page URL,
+nothing pasted into Google Sites.
+
+Behavior change, declared: the step-5 test "mount root 404s too" is
+updated — /login and /login/ now serve the page (200, HTML, button).
+All other step-5 expectations (unprefixed paths 404, wrong-method 405,
+/login/health 200) are unchanged.
+
+Tests: 56/56 pass (51 step-9 tests + 5 new login-page tests:
+mount root with/without trailing slash, page script endpoints +
+no frame-busting, subpaths not swallowed, root mount at /).
+
+Registry change (live, separate from this code push): client
+fedpromptly re-registered with redirect_uris = homepage (kept, so the
+GitHub Pages button keeps working) + https://www.fedpromptly.com/login
+(the embed page) + https://museai-oauth2.fedos.workers.dev/login
+(testing the page on workers.dev). No allowed_scopes on the record
+(verified by KV read before re-posting), so nothing else changed.
+
+After this push, verify: GET /login on workers.dev returns the page
+(200, HTML, button); a full sign-in through the page on workers.dev
+completes and shows the email; the same page on www does the same
+once the route star (set 2026-10-30 ~17:53 EDT) routes it.

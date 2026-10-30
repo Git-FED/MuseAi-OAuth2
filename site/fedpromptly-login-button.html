@@ -1,0 +1,90 @@
+<!-- Sign in with Muse — button + callback for fedpromptly.com.
+     Paste this whole block into the fedpromptly.com homepage as an HTML embed.
+     How it works: the button creates a fresh PKCE pair in the browser,
+     sends the user to Login with Muse for approval, and the same page
+     redeems the returned code for tokens (public client, no secret).
+     NOTE: this points at www.fedpromptly.com/login, which only routes
+     once the Cloudflare route is www.fedpromptly.com/login* (star).
+     Until that star is set, swap OAUTH_HOST below to the workers.dev
+     host for testing only — never publish the workers.dev host. -->
+<div id="muse-login">
+  <button id="muse-login-btn" type="button">Sign in with Muse</button>
+  <p id="muse-login-status"></p>
+</div>
+<script>
+(function () {
+  var OAUTH_HOST = "https://www.fedpromptly.com/login";
+  var CLIENT_ID = "fedpromptly";
+  var REDIRECT_URI = "https://www.fedpromptly.com/";
+  var btn = document.getElementById("muse-login-btn");
+  var status = document.getElementById("muse-login-status");
+
+  function b64url(bytes) {
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+  function randomString(n) {
+    var b = new Uint8Array(n);
+    crypto.getRandomValues(b);
+    return b64url(b);
+  }
+  async function challengeFor(verifier) {
+    var d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+    return b64url(new Uint8Array(d));
+  }
+
+  btn.addEventListener("click", async function () {
+    var verifier = randomString(48);
+    var state = randomString(24);
+    sessionStorage.setItem("muse_verifier", verifier);
+    sessionStorage.setItem("muse_state", state);
+    var q = new URLSearchParams({
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: "code",
+      code_challenge: await challengeFor(verifier),
+      code_challenge_method: "S256",
+      scope: "openid",
+      state: state,
+    });
+    location.href = OAUTH_HOST + "/oauth/authorize?" + q.toString();
+  });
+
+  // Callback: we landed back with ?code=...&state=...
+  var params = new URLSearchParams(location.search);
+  var code = params.get("code");
+  var state = params.get("state");
+  if (code) {
+    (async function () {
+      try {
+        if (state !== sessionStorage.getItem("muse_state")) throw new Error("state mismatch");
+        var verifier = sessionStorage.getItem("muse_verifier");
+        if (!verifier) throw new Error("missing verifier");
+        var tokRes = await fetch(OAUTH_HOST + "/oauth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: code,
+            redirect_uri: REDIRECT_URI,
+            client_id: CLIENT_ID,
+            code_verifier: verifier,
+          }),
+        });
+        var tok = await tokRes.json();
+        if (!tok.access_token) throw new Error(tok.error || "token exchange failed");
+        var uiRes = await fetch(OAUTH_HOST + "/oauth/userinfo", {
+          headers: { Authorization: "Bearer " + tok.access_token },
+        });
+        var ui = await uiRes.json();
+        history.replaceState({}, "", REDIRECT_URI);
+        status.textContent = "Signed in as " + (ui.email || ui.sub || "unknown");
+        btn.style.display = "none";
+      } catch (e) {
+        status.textContent = "Sign-in failed: " + e.message;
+      }
+    })();
+  }
+})();
+</script>

@@ -10,6 +10,7 @@ import { normalizeBasePath, stripBasePath } from "./lib/mount.js";
 import { audit } from "./lib/audit.js";
 import { RATE_LIMITS, checkRateLimit } from "./auth/rate-limit.js";
 import { registerClientHandler, registerMuseKeyHandler } from "./admin/register.js";
+import { loginPageHandler } from "./oauth/login-page.js";
 import { authorizeHandler } from "./oauth/authorize.js";
 import { tokenHandler } from "./oauth/token.js";
 import { userinfoHandler } from "./oauth/userinfo.js";
@@ -27,6 +28,10 @@ const ROUTES = [
     path: "/health",
     handler: async () => json({ ok: true, service: "museai-oauth" }),
   },
+  // Step 10: the mount root serves the embeddable Sign in with Muse
+  // page. Bare /login used to 404 by design (nothing lived at the mount
+  // point); now it is the login surface itself.
+  { method: "GET", path: "/", handler: loginPageHandler },
   { method: "GET", path: "/.well-known/openid-configuration", handler: discoveryHandler },
   { method: "GET", path: "/jwks", handler: jwksHandler },
   { method: "GET", path: "/oauth/authorize", handler: authorizeHandler },
