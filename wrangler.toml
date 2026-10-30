@@ -1,7 +1,7 @@
 name = "museai-oauth2"
 main = "worker.js"
 compatibility_date = "2026-10-28"
-workers_dev = false
+workers_dev = true
 
 # KV is for non-atomic data only. One-time codes, device codes, pending
 # approvals, and refresh tokens live in the Durable Object below — KV
@@ -39,14 +39,14 @@ new_sqlite_classes = ["RateLimitBucket"]
 [triggers]
 crons = []
 
-# Set ISSUER only after a custom domain is attached.
-# [vars]
-# ISSUER = "https://login.example.com"
-
-# Mount prefix (build step 5, 2026-10-30): set BASE_PATH when the
-# provider lives under a path of a larger site instead of a domain
-# root. For the fedpromptly deployment: BASE_PATH = "/login" with
-# ISSUER = "https://fedpromptly.com/login". Leave unset for a
-# root-mounted worker. Dashboard variable, never a secret.
-# [vars]
-# BASE_PATH = "/login"
+# Step 8 (2026-10-30): dashboard plain-text variables do NOT survive
+# a Workers Builds deploy (v14 and v19 both wiped BASE_PATH, ISSUER,
+# SIGNING_PUBLIC_JWK and disabled workers.dev). Public config therefore
+# lives here, in the repo, so every push deploys complete. Secrets
+# (ADMIN_TOKEN, SIGNING_KEY_JWK) stay dashboard-only, never in the repo.
+# SIGNING_PUBLIC_JWK is the PUBLIC key (served by /login/jwks to anyone)
+# — safe to commit by design.
+[vars]
+BASE_PATH = "/login"
+ISSUER = "https://www.fedpromptly.com/login"
+SIGNING_PUBLIC_JWK = '{"crv":"P-256","ext":true,"key_ops":["verify"],"kty":"EC","x":"QnYjUaF-RspFtioQRv_YE0F5kmmziSLK-iGdDObBRXc","y":"345RqACxWfLp460uc7LgCbaZjsIXvimuH-uYhb3e3Jo"}'

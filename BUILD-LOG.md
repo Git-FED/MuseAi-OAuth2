@@ -430,3 +430,30 @@ device page 200). Zip delivered for Git-FED to push; after a green
 deploy, the tail check is: rate-limited routes must answer (not
 503), and any `rate-limit degraded` warnings in the tail name the
 real storage fault for step 8.
+
+## Step 8 — deploy-proof config (2026-10-30, after the v19 wipe)
+
+Found mechanism: a Workers Builds deploy applies ONLY what is in the
+repo. Dashboard plain-text variables do NOT survive it — v14 (the
+rebuild) and v19 (the step-7 push) both arrived missing BASE_PATH,
+ISSUER, and SIGNING_PUBLIC_JWK, with workers.dev disabled again,
+while the two secrets (ADMIN_TOKEN, SIGNING_KEY_JWK) survived both
+times. That is why v19 answers 1042 on workers.dev: the code is
+step 7, but the worker has no mount path, no issuer, and no public
+key, and its workers.dev route is off.
+
+Fix (wrangler.toml only, no code change): workers_dev = true, plus
+a real [vars] section carrying the three public values (BASE_PATH,
+ISSUER on www, SIGNING_PUBLIC_JWK). Public config lives in the repo
+from here on, so every push deploys complete. Secrets stay
+dashboard-only and are never committed. SIGNING_PUBLIC_JWK in the
+repo is safe by design: it is the public key, already served to
+anyone by /login/jwks (its x/y were verified to match the live JWKS
+coordinates before writing it here).
+
+Verification: wrangler.toml parses (workers_dev true, all three vars
+present); node tests unaffected (config-only change). After this
+push, the deploy must show all 8 bindings + workers.dev on, and the
+rate-limited routes must answer (not 503) before registration runs.
+The www route star (www.fedpromptly.com/login*) is still a separate
+pending dashboard action for the www path.
