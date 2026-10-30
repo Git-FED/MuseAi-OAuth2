@@ -42,7 +42,7 @@ button { font-size: 1.1em; padding: 0.6em 1.2em; cursor: pointer; }
 (function () {
   // API base + redirect are this page's own URL, trailing slash stripped,
   // so the same page works on www and on workers.dev.
-  var BASE = location.origin + location.pathname.replace(/\/$/, "");
+  var BASE = location.origin + location.pathname.replace(/\\/$/, "");
   var CLIENT_ID = "fedpromptly";
   var REDIRECT_URI = BASE;
   var btn = document.getElementById("muse-login-btn");
@@ -51,7 +51,7 @@ button { font-size: 1.1em; padding: 0.6em 1.2em; cursor: pointer; }
   function b64url(bytes) {
     var s = "";
     for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    return btoa(s).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
   }
   function randomString(n) {
     var b = new Uint8Array(n);

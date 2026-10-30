@@ -44,6 +44,16 @@ test("page script uses its own URL for authorize, token, userinfo", async () => 
   assert.ok(!/top\.location|parent\.location/.test(r.text));
 });
 
+test("page script survives serving with its regexes intact (click bug regression)", async () => {
+  const r = await get(env("/login"), "https://www.fedpromptly.com/login");
+  const script = r.text.match(/<script>([\s\S]*)<\/script>/)[1];
+  const bs = String.fromCharCode(92);
+  assert.ok(r.text.includes("replace(/" + bs + "/$/"), "BASE regex backslash lost");
+  assert.ok(r.text.includes("replace(/" + bs + "+/g"), "b64url plus regex backslash lost");
+  assert.ok(r.text.includes("replace(/" + bs + "//g"), "b64url slash regex backslash lost");
+  assert.doesNotThrow(() => new Function(script), "served page script must parse so the button works");
+});
+
 test("page route does not swallow subpaths", async () => {
   const r = await get(env("/login"), "https://www.fedpromptly.com/login/oauth/authorize");
   assert.ok(!r.text.includes('id="muse-login-btn"'));
