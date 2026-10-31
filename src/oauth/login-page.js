@@ -1,4 +1,12 @@
 // Step 10 — worker-hosted Sign in with Muse page.
+// Step 15 — post-login destination: after a successful sign-in
+// (code exchanged, userinfo read), this page sends the user to
+// https://www.fedpromptly.com/social instead of staying on /login.
+// The OAuth redirect_uri does NOT change: it stays this page's own
+// URL, because this page is what exchanges the code. The /social
+// move is a plain navigation after sign-in is already complete, so
+// it cannot break the code exchange. A 1.5s pause lets the user
+// see "Signed in as ..." before the move.
 //
 // The mount root (GET / after BASE_PATH stripping, i.e. /login on www)
 // serves this page. It is the embeddable login surface: a site that
@@ -111,8 +119,9 @@ button { font-size: 1.1em; padding: 0.6em 1.2em; cursor: pointer; }
         });
         var ui = await uiRes.json();
         history.replaceState({}, "", REDIRECT_URI);
-        status.textContent = "Signed in as " + (ui.email || ui.sub || "unknown");
+        status.textContent = "Signed in as " + (ui.email || ui.sub || "unknown") + " — taking you to FedPromptly Social…";
         btn.style.display = "none";
+        setTimeout(function () { location.href = "https://www.fedpromptly.com/social"; }, 1500);
       } catch (e) {
         status.textContent = "Sign-in failed: " + e.message;
       }

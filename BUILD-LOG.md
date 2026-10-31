@@ -679,3 +679,21 @@ click-opened muse.ai popup + copy message with the exact pending id
 message with the exact device code + no textarea). Zip below
 supersedes step 13 the same way step 13 superseded step 12: full
 bundle, push this one only.
+
+## STEP 15 — POST-LOGIN DESTINATION /social (2026-10-31, Git-FED: "lets have it go to fedpromptly.com/social instead of /login when logged in")
+
+What changed (src/oauth/login-page.js only):
+- After a successful sign-in (code exchanged, userinfo read, code
+  scrubbed from the address bar), the login page now shows
+  "Signed in as ... — taking you to FedPromptly Social…" and, after
+  1.5s, navigates to https://www.fedpromptly.com/social.
+- The OAuth redirect_uri does NOT change: it stays the login page's
+  own URL, because that page is what exchanges the code. /social
+  (Google Sites) cannot exchange a code, so making /social the
+  redirect_uri would break sign-in. The /social move is a plain
+  navigation after sign-in is already complete.
+
+Tests: 71/71 pass (69 old + 2 new step15: login page navigates to
+/social after sign-in; redirect_uri is still the page itself). Zip
+below supersedes step 14 the same way: full bundle, push this one
+only.
