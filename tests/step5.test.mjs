@@ -197,10 +197,12 @@ test("device verification_uri sits under /login, and the entry page posts there"
   });
   assert.equal(page.status, 200, page.text);
   assert.match(page.text, /FedPromptly/);
-  // The detail page carries prefixed approval/deny fetches (it has no
-  // entry form — the action assertion belongs on the blank form above).
-  assert.match(page.text, /fetch\("\/login\/oauth\/approval"/);
+  // Step 13: the detail page carries the prefixed auto-finish poll
+  // and deny fetches (it has no entry form — the action assertion
+  // belongs on the blank form above), and no paste/approval fetch.
+  assert.match(page.text, /fetch\("\/login\/oauth\/pending-status\?device_code="/);
   assert.match(page.text, /fetch\("\/login\/oauth\/deny"/);
+  assert.doesNotMatch(page.text, /fetch\("\/login\/oauth\/approval"/);
 });
 
 test("prefix-confusion paths never match: /loginevil and /loginfoo are 404", async () => {
@@ -224,10 +226,13 @@ test("prefixed pages carry prefixed internal links, never root provider links", 
   const auth = await call(env, "GET",
     `/login/oauth/authorize?client_id=fedpromptly&redirect_uri=${encodeURIComponent(REDIRECT)}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&scope=openid&state=xyz`);
   assert.equal(auth.status, 200, auth.text);
-  assert.match(auth.text, /fetch\("\/login\/oauth\/approval"/);
+  // Step 13: prefixed auto-finish poll + deny, never a root link,
+  // and no paste/approval fetch at all.
+  assert.match(auth.text, /fetch\("\/login\/oauth\/pending-status\?pending_id="/);
   assert.match(auth.text, /fetch\("\/login\/oauth\/deny"/);
-  assert.doesNotMatch(auth.text, /fetch\("\/oauth\/approval"/);
+  assert.doesNotMatch(auth.text, /fetch\("\/oauth\/pending-status/);
   assert.doesNotMatch(auth.text, /fetch\("\/oauth\/deny"/);
+  assert.doesNotMatch(auth.text, /fetch\("\/login\/oauth\/approval"/);
 });
 
 test("rate limits still fire under the prefix", async () => {
@@ -251,7 +256,9 @@ test("BASE_PATH unset: previous root behavior is unchanged", async () => {
     `/oauth/authorize?client_id=fedpromptly&redirect_uri=${encodeURIComponent(REDIRECT)}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&scope=openid&state=xyz`);
   assert.equal(auth.status, 200, auth.text);
   const pending = /id="pending-id">([^<]+)/.exec(auth.text)[1];
-  assert.match(auth.text, /fetch\("\/oauth\/approval"/);
+  // Step 13: root mount polls the root pending-status, no approval fetch.
+  assert.match(auth.text, /fetch\("\/oauth\/pending-status\?pending_id="/);
+  assert.doesNotMatch(auth.text, /fetch\("\/oauth\/approval"/);
   const sig = await signApproval(museKey, "pending", pending, "muse-test", "git-fed", "user@example.com");
   const appr = await call(env, "POST", "/oauth/approval", {
     body: JSON.stringify({ pending_id: pending, muse_id: "muse-test", username: "git-fed", email: "user@example.com", signature: sig }),

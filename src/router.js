@@ -15,12 +15,39 @@ import { authorizeHandler } from "./oauth/authorize.js";
 import { tokenHandler } from "./oauth/token.js";
 import { userinfoHandler } from "./oauth/userinfo.js";
 import { approvalHandler } from "./oauth/approval.js";
+import { pendingStatusHandler } from "./oauth/pending-status.js";
 import { denyHandler } from "./oauth/deny.js";
 import { deviceGetHandler, devicePostHandler } from "./oauth/device-entry.js";
 import { deviceAuthorizationHandler } from "./oauth/device-authorization.js";
 import { revocationHandler } from "./oauth/revocation.js";
 import { discoveryHandler } from "./oauth/discovery.js";
 import { jwksHandler } from "./oauth/jwks.js";
+
+// Step 11: browser CORS for the two public-client endpoints that a
+// third-party site calls from its own pages (e.g. the FED Hub login).
+// The login page itself is same-origin and never needed this; a site
+// like hub.fedos.workers.dev cannot read /oauth/token or /oauth/userinfo
+// responses without it. Narrow on purpose: admin, approval, and device
+// routes get no CORS headers and still 405 OPTIONS. No credentials mode:
+// the hub keeps tokens in sessionStorage, never cookies, so reflecting
+// the Origin here cannot leak a session to another site.
+const CORS_PATHS = new Set(["/oauth/token", "/oauth/userinfo"]);
+
+function corsHeaders(request) {
+  const origin = request.headers.get("origin");
+  return {
+    "access-control-allow-origin": origin || "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "Content-Type, Authorization",
+    vary: "Origin",
+  };
+}
+
+function withCors(response, request) {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(corsHeaders(request))) headers.set(k, v);
+  return new Response(response.body, { status: response.status, headers });
+}
 
 const ROUTES = [
   {
@@ -38,6 +65,8 @@ const ROUTES = [
   { method: "POST", path: "/oauth/token", handler: tokenHandler },
   { method: "GET", path: "/oauth/userinfo", handler: userinfoHandler },
   { method: "POST", path: "/oauth/approval", handler: approvalHandler },
+  // Step 13: auto-finish poll for the approval page.
+  { method: "GET", path: "/oauth/pending-status", handler: pendingStatusHandler },
   { method: "POST", path: "/oauth/deny", handler: denyHandler },
   { method: "GET", path: "/device", handler: deviceGetHandler },
   { method: "POST", path: "/device", handler: devicePostHandler },
@@ -59,6 +88,13 @@ export async function route(request, env) {
   const { matched, stripped } = stripBasePath(rawPath, basePath);
   if (!matched) return json({ error: "not_found" }, 404);
   const path = stripped;
+  // Step 11: CORS preflight for the browser-called endpoints. This is
+  // not an OAuth action, so it answers before route matching, the kill
+  // switch, and rate limiting; the real call is still gated by all of
+  // those. Other paths keep their existing 404/405 behavior.
+  if (request.method === "OPTIONS" && CORS_PATHS.has(path)) {
+    return new Response(null, { status: 204, headers: corsHeaders(request) });
+  }
   // Match on path AND method: /device serves both GET and POST, and
   // matching on path alone would 405 the second method on a shared path.
   const match = ROUTES.find((r) => r.path === path && r.method === request.method);
@@ -96,7 +132,8 @@ export async function route(request, env) {
     }
   }
   try {
-    return await match.handler(request, env);
+    const res = await match.handler(request, env);
+    return CORS_PATHS.has(path) ? withCors(res, request) : res;
   } catch {
     return json({ error: "server_error" }, 500);
   }

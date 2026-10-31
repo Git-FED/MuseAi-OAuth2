@@ -20,6 +20,9 @@ export const RATE_LIMITS = {
   "/oauth/authorize": { ip: 60, client: 300, windowMs: 60_000 },
   "/oauth/token": { ip: 120, client: 600, windowMs: 60_000 },
   "/oauth/approval": { ip: 30, pending: 10, pendingWindowMs: 600_000, windowMs: 60_000 },
+  // Step 13: auto-finish poll, 2s cadence from one browser tab. IP
+  // bucket only — the id in the query is the capability, not a bucket.
+  "/oauth/pending-status": { ip: 60, windowMs: 60_000 },
   // Deny shares the approval shape: an IP bucket plus a per-request
   // bucket (the pending/device bucket reader already reads pending_id
   // or device_code from the body), so deny cannot be hammered either.

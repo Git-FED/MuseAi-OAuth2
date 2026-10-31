@@ -2,8 +2,12 @@
 // authorize-flow approval page and the device user-code entry page.
 //
 // Rules these pages never break:
-// - No typed username or email field anywhere. Approval comes only from
-//   a Muse-signed payload, pasted by the user (or supplied by their Muse).
+// - No typed username or email field anywhere, and (step 13) no pasted
+//   payload either. Approval comes only from a Muse-signed payload
+//   submitted directly by the Muse to POST /oauth/approval; the page
+//   polls GET /oauth/pending-status and finishes itself when the
+//   request is approved or denied. No paste, no Approve click, no
+//   Continue click.
 // - Every value that comes from a registry record or a request is HTML-
 //   escaped before it reaches the page.
 // - Error pages say what went wrong in plain language, never a stack
@@ -18,36 +22,73 @@ export function escapeHtml(s) {
 }
 
 function pageShell(title, body) {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body>${body}</body></html>`;
+  // Styling only: one inline <style> block and a <main> card wrapper.
+  // No form, script, route, or approval/deny logic is touched here.
+  // System font stack, no external stylesheets, fonts, or images, so
+  // the worker stays self-contained. Mobile-first: the card fills a
+  // phone screen with comfortable padding.
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px;background:#f2f2f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.5}
+main{max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e2de;border-radius:12px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+h1{font-size:22px;line-height:1.25;margin:0 0 16px}
+p{margin:0 0 12px}
+ul{margin:0 0 12px;padding-left:20px}
+li{margin:2px 0}
+label{font-weight:600}
+textarea,input[type="text"]{width:100%;padding:10px 12px;border:1px solid #ccc;border-radius:8px;font:inherit;margin:6px 0 12px}
+button{width:100%;padding:12px;border:0;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+#deny-form button{background:transparent;color:#555;border:1px solid #ccc}
+#deny-form{margin-top:8px}
+#deny-result{font-weight:600}
+span#pending-id,span#user-code{word-break:break-all}
+@media(max-width:480px){body{padding:16px 12px}main{padding:20px 16px}}
+</style></head><body><main>${body}</main></body></html>`;
 }
 
 function scopeList(scopes) {
   return scopes.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
 }
 
-function signedPayloadForm({ idField, idValue, approvePath, resultNote }) {
-  // approvePath is built by the caller from BASE_PATH, so the form
-  // posts to the provider's real mount, never a root path that 404s
-  // under a prefix mount.
-  return `<form id="approval-form">
-<label for="payload">Muse-signed approval payload (JSON):</label><br>
-<textarea id="payload" name="payload" rows="8" cols="80" placeholder='{"${idField}":"${escapeHtml(idValue)}","muse_id":"...","username":"...","email":"...","signature":"..."}'></textarea><br>
-<button type="submit">Approve</button>
-</form>
-<p id="result"></p>
+// Step 13 auto-finish: the authorize page waits, then navigates
+// itself on approval/denial. The Muse approves out-of-band by POSTing
+// its signed payload to /oauth/approval — the user never pastes it.
+function authorizeAutoFinish({ pendingId, basePath = "" }) {
+  return `<p id="auto-status">Waiting for your Muse to approve…</p>
 <script>
-document.getElementById("approval-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  let payload;
-  try { payload = JSON.parse(document.getElementById("payload").value); }
-  catch { document.getElementById("result").textContent = "Approval failed: that payload is not valid JSON."; return; }
-  const res = await fetch("${approvePath}", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-  const data = await res.json().catch(() => ({}));
-  const el = document.getElementById("result");
-  if (data.redirect_to) { el.innerHTML = 'Approved. <a href="' + data.redirect_to + '">Continue</a>'; }
-  else if (data.approved) { el.textContent = "${resultNote}"; }
-  else { el.textContent = "Approval failed: " + (data.error || res.status); }
-});
+(function () {
+  var statusEl = document.getElementById("auto-status");
+  var timer = setInterval(async function () {
+    var res;
+    try { res = await fetch("${basePath}/oauth/pending-status?pending_id=" + encodeURIComponent("${escapeHtml(pendingId)}")); }
+    catch { return; }
+    var data = await res.json().catch(function () { return {}; });
+    if (data.redirect_to) { clearInterval(timer); window.location = data.redirect_to; }
+    else if (data.status === "awaiting") { return; }
+    else { clearInterval(timer); statusEl.textContent = "This sign-in request is no longer waiting. Close this page and try signing in again."; }
+  }, 2000);
+})();
+</script>`;
+}
+
+// Step 13 auto-finish for the device page: the device client polls
+// /oauth/token for its tokens, so this page only shows the outcome.
+function deviceAutoFinish({ deviceCode, basePath = "" }) {
+  return `<p id="auto-status">Waiting for your Muse to approve…</p>
+<script>
+(function () {
+  var statusEl = document.getElementById("auto-status");
+  var timer = setInterval(async function () {
+    var res;
+    try { res = await fetch("${basePath}/oauth/pending-status?device_code=" + encodeURIComponent("${escapeHtml(deviceCode)}")); }
+    catch { return; }
+    var data = await res.json().catch(function () { return {}; });
+    if (data.status === "awaiting") { return; }
+    clearInterval(timer);
+    if (data.status === "approved") { statusEl.textContent = "Approved. Your device can now finish signing in."; }
+    else { statusEl.textContent = "Denied. The device will stop waiting."; }
+  }, 2000);
+})();
 </script>`;
 }
 
@@ -88,7 +129,7 @@ export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendin
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Pending request: <span id="pending-id">${escapeHtml(pendingId)}</span></p>
-${signedPayloadForm({ idField: "pending_id", idValue: pendingId, approvePath: `${basePath}/oauth/approval`, resultNote: "Approved." })}
+${authorizeAutoFinish({ pendingId, basePath })}
 ${denyForm({ idField: "pending_id", idValue: pendingId, basePath })}`,
   );
 }
@@ -120,7 +161,7 @@ export function deviceDetailPage({ clientName, scopes, deviceCode, userCode, bas
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Device code: <span id="user-code">${escapeHtml(userCode)}</span></p>
-${signedPayloadForm({ idField: "device_code", idValue: deviceCode, approvePath: `${basePath}/oauth/approval`, resultNote: "Approved. Your device can now finish signing in." })}
+${deviceAutoFinish({ deviceCode, basePath })}
 ${denyForm({ idField: "device_code", idValue: deviceCode, basePath })}`,
   );
 }

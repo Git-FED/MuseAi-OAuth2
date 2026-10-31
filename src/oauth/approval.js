@@ -103,7 +103,10 @@ export async function approvalHandler(request, env) {
       },
       600_000,
     );
-    await stub.replace({ ...rec, status: "approved", username, email, muse_id }, remaining);
+    // Step 13: store the code on the pending record so the auto-finish
+    // poll endpoint can rebuild the redirect for the waiting page.
+    // The code is still redeemable only with the PKCE verifier.
+    await stub.replace({ ...rec, status: "approved", username, email, muse_id, auth_code: code }, remaining);
     await audit(env, "approval_approved", { actor: muse_id, clientId: rec.client_id, route: "/oauth/approval", outcome: "success", detail: "pending" });
     const redirect = new URL(rec.redirect_uri);
     redirect.searchParams.set("code", code);

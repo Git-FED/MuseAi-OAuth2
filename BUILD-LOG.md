@@ -537,3 +537,113 @@ After this push, verify: GET /login on workers.dev returns the page
 (200, HTML, button); a full sign-in through the page on workers.dev
 completes and shows the email; the same page on www does the same
 once the route star (set 2026-10-30 ~17:53 EDT) routes it.
+
+## STEP 10 FIX — button did nothing (2026-10-30 ~18:16-18:19 EDT)
+His www screenshot proved the page serves, but clicking the button did
+nothing. Root cause, proven by byte counts, not guessing: the page's
+script lives inside a JS template literal in src/oauth/login-page.js, and
+a template literal EATS a backslash before / or + (identity escape). So
+the SERVED script had `replace(//$/, "")` and `replace(/+/g, ...)` —
+a syntax error — the whole script failed to load and no click handler
+was ever attached. The source file and the zip LOOKED right, and the old
+tests checked the source text, not the served string, so they missed it.
+Fix: double the backslashes in the template literal (3 markers), so the
+served string carries the single backslashes the regexes need. Proof:
+evaluated served script now parses (node --check OK, was FAIL), and a
+stubbed-browser click run sets location.href to the exact authorize URL
+(client + page redirect + S256 challenge + state, verifier/state stored).
+Regression test added (login-page.test.mjs, "survives serving"): asserts
+the served text keeps all three backslashes and that new Function on the
+served script does not throw. Suite: 57/57 pass. Zip:
+~/workspace/museai-oauth-step10-fix.zip (53 entries). NOTE: the plain
+HTML button file (site/fedpromptly-login-button.html, GitHub Pages) was
+never affected — it is not a template literal, its backslashes are fine.
+
+## STEP 11 — CORS FOR THIRD-PARTY SITE LOGINS (2026-10-30 ~20:30 EDT, for FED Hub)
+Git-FED ordered Muse login added to https://hub.fedos.workers.dev/ as the
+first real-site test. Hub already has its own login UI (Supabase
+email/password modal, browser-side); the Muse button joins that modal.
+Hub becomes a real OAuth client: client "hub" registered 2026-10-30
+(admin POST 201, authorize check 200 rendering the approval page naming
+"FED Hub"), redirect_uri https://hub.fedos.workers.dev/ (exact match —
+authorize.js requires includes(), so the hub page sends exactly that and
+handles the returned ?code=&state= on the homepage itself; no new worker
+route needed, because hub 404s unknown paths). Hub page flow (browser
+PKCE, sessionStorage): button -> authorize -> approval page -> Continue
+-> homepage callback exchanges code, fetches userinfo, stores the session,
+header buttons show the Muse username; clicking a login button while a
+Muse session exists clears it. Supabase and Muse sessions coexist; the
+button shows one name (Supabase wins if both, via its own handler).
+BLOCKER FOUND: the oauth2 worker sent NO CORS headers anywhere, so a
+browser on hub.fedos.workers.dev could not read /oauth/token or
+/oauth/userinfo responses at all (the step-10 login page never needed
+CORS — it is same-origin to its own API base). Fix, in src/router.js
+only: OPTIONS preflight to /oauth/token and /oauth/userinfo answers 204
+with allow-origin (request Origin echoed, else *), allow-methods GET/
+POST/OPTIONS, allow-headers Content-Type/Authorization, Vary Origin;
+handler responses on those two paths are wrapped with the same headers.
+Narrow on purpose: admin, approval, and device routes get no CORS headers
+and still 405 OPTIONS. No credentials mode: hub keeps tokens in
+sessionStorage, never cookies, so echoing Origin cannot leak a session.
+Tests added (tests/cors.test.mjs, 5 tests: both preflights 204, admin
+OPTIONS still 405 without headers, token 400 + userinfo 401 both carry
+the headers). Suite: 62/62 pass (57 old + 5 new). Zip:
+~/workspace/museai-oauth-step11-cors.zip. DEPLOY ORDER: (1) push this zip
+to MuseAi-OAuth2 (Workers Builds), (2) deploy the hub page
+(~/workspace/hub-login/hub-with-muse-login.html) via hub's wrangler
+project, (3) test end to end. Hub deliverable notes:
+~/workspace/hub-login/muse-login-snippet.html (the two insertions, for
+patching hub source by hand if it drifted from the live HTML).
+
+## STEP 13 — AUTOMATIC APPROVAL, NO MORE COPY AND PASTE (2026-10-31, Git-FED order: "its time to get to upgrading the oauth so its automatic no more copy and pasting")
+
+This step supersedes step 12: it is built on the step-12 code (step-12
+styling + step-11 CORS + step-10 login page), so pushing this zip
+replaces the step-12 push — do NOT push step 12 separately.
+
+What changed, and what "automatic" honestly means:
+- The approval page NO LONGER has a paste box, an Approve click, or a
+  Continue link. It shows "Waiting for your Muse to approve…" and
+  polls GET /oauth/pending-status every 2 seconds. On approval it
+  navigates itself to the client's callback with the code; on denial
+  it navigates itself to the client's access_denied redirect. The
+  Deny button stays — that is the human consent surface on the page.
+- The Muse approves OUT OF BAND, exactly as before, by POSTing its
+  Ed25519-signed payload to /oauth/approval — no paste, no browser
+  form. What is new is only that the page finishes itself once that
+  API approval lands. There is still no push from the worker to a
+  Muse: the user tells their Muse to approve (in chat, as now), the
+  Muse posts the signed approval, the page completes. A site can
+  never auto-approve itself — approval still requires a registered
+  Muse key and a valid signature, and the user still sees the client
+  name, redirect host, and scopes before anything happens.
+- New endpoint (src/oauth/pending-status.js, route in src/router.js):
+  GET /oauth/pending-status?pending_id=… or ?device_code=…. Awaiting
+  -> { status: "awaiting" }; approved authorize -> { status:
+  "approved", redirect_to }; denied authorize -> { status: "denied",
+  redirect_to }; device -> status only (the device client already
+  polls /oauth/token). Unknown/expired ids fail closed with the same
+  invalid_pending / invalid_device errors. Rate-limited 60/IP/min.
+  No audit entry per poll (a 2s poll would flood KV); approvals,
+  denials, and redemptions are still audited where they happen.
+- approval.js now stores the auth code on the pending record when it
+  flips to approved, so the poll endpoint can rebuild the redirect.
+  The code is still useless without the PKCE verifier, which lives
+  only in the client page that started the flow.
+- Device detail page gets the same treatment: no paste form, poll
+  shows "Approved. Your device can now finish signing in." (the
+  device itself polls /oauth/token, unchanged).
+- Tests: 67/67 pass (62 old + 5 new step13 tests: page has no
+  textarea/form, only the poller; awaiting -> approved with a
+  redeemable code via the polled redirect; denied -> access_denied;
+  unknown/missing/both ids fail closed; device awaiting/approved
+  status-only). Three step-5 assertions were updated, not weakened:
+  they now assert the prefixed pending-status poll + deny fetches
+  and the ABSENCE of any approval fetch. Page CSS for the removed
+  approval form was deleted with the form.
+
+What this does NOT change: PKCE S256 mandatory, exact redirect match,
+registered Muse keys only, self-supplied keys rejected, email
+unverified (option 2), 10-minute pending TTL, token/refresh/device
+flows, CORS, login page, or any dashboard secret. Nothing deployed,
+nothing pushed to GitHub in this step — Git-FED pushes the zip.
