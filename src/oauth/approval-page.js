@@ -14,6 +14,8 @@
 //   and "Copy approval message" copies a one-line message with the
 //   pending/device id for the user to paste into that popup chat.
 //   The Muse approves there; this page's poller finishes the sign-in.
+// - (Step 17, speed-up) "Copy ID" copies just the pending/device id
+//   alone, for users who paste only the id into their Muse chat.
 // - Every value that comes from a registry record or a request is HTML-
 //   escaped before it reaches the page.
 // - Error pages say what went wrong in plain language, never a stack
@@ -46,6 +48,7 @@ textarea,input[type="text"]{width:100%;padding:10px 12px;border:1px solid #ccc;b
 button{width:100%;padding:12px;border:0;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
 #open-muse-btn{background:#1a1a1a;color:#fff}
 #copy-btn{background:transparent;color:#1a1a1a;border:1px solid #ccc;margin-top:8px}
+#copy-id-btn{background:transparent;color:#1a1a1a;border:1px solid #ccc;margin-top:8px}
 #deny-form button{background:transparent;color:#555;border:1px solid #ccc}
 #deny-form{margin-top:8px}
 #deny-result{font-weight:600}
@@ -105,10 +108,13 @@ function deviceAutoFinish({ deviceCode, basePath = "" }) {
 // needs to sign (pending id for authorize, device code for device),
 // so the user pastes one line into the popup chat instead of typing
 // an id from memory. window.open runs only inside the click handler.
-function musePopupHelper({ copyMessage }) {
+// Step 17 adds "Copy ID": just the id alone, for users who paste
+// only the id into their Muse chat.
+function musePopupHelper({ copyMessage, copyId }) {
   return `<p>Your Muse does not get a ping from this page. Open Muse here, paste the message below into it, and tell it to approve — this page will finish itself.</p>
 <button id="open-muse-btn" type="button">Open Muse AI to approve</button>
 <button id="copy-btn" type="button">Copy approval message</button>
+<button id="copy-id-btn" type="button">Copy ID</button>
 <p id="copy-result"></p>
 <script>
 document.getElementById("open-muse-btn").addEventListener("click", function () {
@@ -118,6 +124,12 @@ document.getElementById("copy-btn").addEventListener("click", async function () 
   var msg = "${escapeHtml(copyMessage)}";
   var el = document.getElementById("copy-result");
   try { await navigator.clipboard.writeText(msg); el.textContent = "Copied — paste it into Muse in the popup."; }
+  catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
+});
+document.getElementById("copy-id-btn").addEventListener("click", async function () {
+  var id = "${escapeHtml(copyId)}";
+  var el = document.getElementById("copy-result");
+  try { await navigator.clipboard.writeText(id); el.textContent = "ID copied — paste it into Muse in the popup."; }
   catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
 });
 </script>`;
@@ -160,7 +172,7 @@ export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendin
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Pending request: <span id="pending-id">${escapeHtml(pendingId)}</span></p>
-${musePopupHelper({ copyMessage: `Please approve my Muse sign-in. Pending request: ${pendingId}` })}
+${musePopupHelper({ copyMessage: `Please approve my Muse sign-in. Pending request: ${pendingId}`, copyId: pendingId })}
 ${authorizeAutoFinish({ pendingId, basePath })}
 ${denyForm({ idField: "pending_id", idValue: pendingId, basePath })}`,
   );
@@ -193,7 +205,7 @@ export function deviceDetailPage({ clientName, scopes, deviceCode, userCode, bas
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Device code: <span id="user-code">${escapeHtml(userCode)}</span></p>
-${musePopupHelper({ copyMessage: `Please approve my Muse device sign-in. Device code: ${deviceCode}` })}
+${musePopupHelper({ copyMessage: `Please approve my Muse device sign-in. Device code: ${deviceCode}`, copyId: deviceCode })}
 ${deviceAutoFinish({ deviceCode, basePath })}
 ${denyForm({ idField: "device_code", idValue: deviceCode, basePath })}`,
   );

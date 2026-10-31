@@ -748,3 +748,6 @@ tells a returning user from a stranger. No self-registration, no
 profile editing endpoint, no admin profile lookup in this step:
 profiles are written only by a signed approval + token redemption,
 and read only by the token holder.
+
+## Step 17 — Copy ID button (2026-10-31 evening)
+Approval page (authorize + device) now has three buttons: Open Muse AI to approve (step 14), Copy approval message (step 14), and Copy ID (new — copies just the pending/device id alone). No flow change: page still polls and finishes itself, Muse still approves out-of-band with a signed payload. Tests: 80/80 pass (78 old + 2 new step17 tests).
