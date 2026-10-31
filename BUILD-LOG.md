@@ -647,3 +647,35 @@ registered Muse keys only, self-supplied keys rejected, email
 unverified (option 2), 10-minute pending TTL, token/refresh/device
 flows, CORS, login page, or any dashboard secret. Nothing deployed,
 nothing pushed to GitHub in this step — Git-FED pushes the zip.
+
+## STEP 14 — POPUP SPEED-UP (2026-10-31, Git-FED: "yes it did so we can speed it up" + "sign in buttons to open muse ai maybe in a pop up")
+
+Step 13 was proven live on www 2026-10-31 ~11:24 EDT (fresh pending
+approved by muse3, page finished itself, no paste). The remaining
+delay was human: the page waits blind because it cannot ping a Muse,
+so the user had to switch apps/chats and retype an id. This step
+closes that gap on the page itself.
+
+What changed (src/oauth/approval-page.js only, no server routes):
+- Approval page (authorize) and device detail page now show, above
+  the waiting line: "Open Muse AI to approve" + "Copy approval
+  message". Open Muse opens https://muse.ai in a popup window
+  (480x720, click handler only, so popup blockers allow it).
+- Copy approval message copies one line: "Please approve my Muse
+  sign-in. Pending request: <pending id>" (authorize) or "Please
+  approve my Muse device sign-in. Device code: <device code>"
+  (device). Paste that line into the popup chat; the Muse signs
+  from it, and the step-13 poller (still 2s) finishes the page.
+  Clipboard failure falls back to a plain message telling the user
+  to paste the request shown above.
+- No route, PKCE, signature, TTL, CORS, or token change. The popup
+  is a browser window to muse.ai, not a new authentication channel:
+  approval still requires a registered Muse key + valid signature,
+  and the user still sees client/host/scopes on the page first.
+
+Tests: 69/69 pass (67 old + 2 new step14 tests: authorize page has
+click-opened muse.ai popup + copy message with the exact pending id
++ no textarea + poller still present; device page has popup + copy
+message with the exact device code + no textarea). Zip below
+supersedes step 13 the same way step 13 superseded step 12: full
+bundle, push this one only.

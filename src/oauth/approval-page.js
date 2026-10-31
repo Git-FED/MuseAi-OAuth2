@@ -8,6 +8,12 @@
 //   polls GET /oauth/pending-status and finishes itself when the
 //   request is approved or denied. No paste, no Approve click, no
 //   Continue click.
+// - (Step 14, speed-up) The page cannot ping a Muse, so it offers a
+//   popup instead: "Open Muse AI to approve" opens muse.ai in a popup
+//   window (click handler only, so popup blockers let it through),
+//   and "Copy approval message" copies a one-line message with the
+//   pending/device id for the user to paste into that popup chat.
+//   The Muse approves there; this page's poller finishes the sign-in.
 // - Every value that comes from a registry record or a request is HTML-
 //   escaped before it reaches the page.
 // - Error pages say what went wrong in plain language, never a stack
@@ -38,6 +44,8 @@ li{margin:2px 0}
 label{font-weight:600}
 textarea,input[type="text"]{width:100%;padding:10px 12px;border:1px solid #ccc;border-radius:8px;font:inherit;margin:6px 0 12px}
 button{width:100%;padding:12px;border:0;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+#open-muse-btn{background:#1a1a1a;color:#fff}
+#copy-btn{background:transparent;color:#1a1a1a;border:1px solid #ccc;margin-top:8px}
 #deny-form button{background:transparent;color:#555;border:1px solid #ccc}
 #deny-form{margin-top:8px}
 #deny-result{font-weight:600}
@@ -92,6 +100,29 @@ function deviceAutoFinish({ deviceCode, basePath = "" }) {
 </script>`;
 }
 
+// Step 14 popup helper: open Muse AI in a popup + copy a one-line
+// approval message. The copy message carries the exact id the Muse
+// needs to sign (pending id for authorize, device code for device),
+// so the user pastes one line into the popup chat instead of typing
+// an id from memory. window.open runs only inside the click handler.
+function musePopupHelper({ copyMessage }) {
+  return `<p>Your Muse does not get a ping from this page. Open Muse here, paste the message below into it, and tell it to approve — this page will finish itself.</p>
+<button id="open-muse-btn" type="button">Open Muse AI to approve</button>
+<button id="copy-btn" type="button">Copy approval message</button>
+<p id="copy-result"></p>
+<script>
+document.getElementById("open-muse-btn").addEventListener("click", function () {
+  window.open("https://muse.ai", "muse-approve", "width=480,height=720,noopener");
+});
+document.getElementById("copy-btn").addEventListener("click", async function () {
+  var msg = "${escapeHtml(copyMessage)}";
+  var el = document.getElementById("copy-result");
+  try { await navigator.clipboard.writeText(msg); el.textContent = "Copied — paste it into Muse in the popup."; }
+  catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
+});
+</script>`;
+}
+
 function denyForm({ idField, idValue, basePath = "" }) {
   return `<form id="deny-form">
 <input type="hidden" name="${idField}" value="${escapeHtml(idValue)}">
@@ -129,6 +160,7 @@ export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendin
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Pending request: <span id="pending-id">${escapeHtml(pendingId)}</span></p>
+${musePopupHelper({ copyMessage: `Please approve my Muse sign-in. Pending request: ${pendingId}` })}
 ${authorizeAutoFinish({ pendingId, basePath })}
 ${denyForm({ idField: "pending_id", idValue: pendingId, basePath })}`,
   );
@@ -161,6 +193,7 @@ export function deviceDetailPage({ clientName, scopes, deviceCode, userCode, bas
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Device code: <span id="user-code">${escapeHtml(userCode)}</span></p>
+${musePopupHelper({ copyMessage: `Please approve my Muse device sign-in. Device code: ${deviceCode}` })}
 ${deviceAutoFinish({ deviceCode, basePath })}
 ${denyForm({ idField: "device_code", idValue: deviceCode, basePath })}`,
   );
