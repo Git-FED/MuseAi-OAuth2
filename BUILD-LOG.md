@@ -697,3 +697,54 @@ Tests: 71/71 pass (69 old + 2 new step15: login page navigates to
 /social after sign-in; redirect_uri is still the page itself). Zip
 below supersedes step 14 the same way: full bundle, push this one
 only.
+
+## STEP 16 — PROFILES (2026-10-31, Git-FED order: "Let's begin with profiles")
+
+Profiles first, per the 2026-10-31 direction call: login was a door
+with no user home — the site got an id and held nothing. Now it has
+one, with no password and no Supabase.
+
+What changed:
+- New module src/lib/profile.js. Profile record in OAUTH_KV (the
+  non-atomic store, same as the client/Muse-key registries):
+  profile:<sub> -> { sub, preferred_username, email,
+  email_verified: false, first_sign_in, last_sign_in, sign_in_count }.
+  Keyed by the userinfo `sub` (muse:<muse_id>), the stable id a site
+  already gets. Read-time validation mirrors registry.js: a malformed
+  record reads as no profile, and the next fresh sign-in overwrites
+  it with a valid one.
+- src/oauth/token.js records a sign-in on authorization_code AND
+  device_code redemption only. Refresh rotation deliberately does NOT
+  record: a refresh is a session continuation, not a sign-in, so it
+  must not bump the count or move last_sign_in. A repeat sign-in
+  keeps first_sign_in, increments sign_in_count, and updates
+  username/email to the latest approved identity (approval is the
+  source of truth). A failed profile write never fails the login —
+  recordSignIn swallows KV errors like audit does — so a login whose
+  write failed simply has no profile until its next sign-in.
+- New endpoint GET /oauth/profile (src/oauth/profile.js, route in
+  src/router.js): Bearer access token in, profile out. No token or
+  bad token -> 401 invalid_token (same as userinfo); no valid record
+  for the token's sub -> 404 profile_not_found (covers tokens issued
+  before step 16 and failed profile writes). CORS matches userinfo:
+  preflight 204 + response headers, so a real JS site (hub, forum2)
+  can read it from its own pages. Discovery is unchanged on purpose:
+  /oauth/profile is a provider extension, not an OIDC endpoint, so
+  it is not listed in .well-known/openid-configuration; sites call
+  it directly with the same access token they use for userinfo.
+- Tests: 78/78 pass (71 old + 7 new step16 tests: first sign-in
+  creates the profile; second keeps first, bumps count, updates
+  identity; refresh does not count; device sign-in creates one;
+  401s; missing/malformed -> 404 and next sign-in repairs; CORS).
+  Zip below supersedes step 15 the same way: full bundle, push this
+  one only.
+
+What this does NOT change, stated plainly: /social (Google Sites)
+still cannot read a profile — Google Sites runs no page JS, so it
+cannot call /oauth/profile any more than it could call userinfo.
+Step 16 gives the profile a home on the provider; a real JS site
+(hub next, per the direction call) is what actually reads it and
+tells a returning user from a stranger. No self-registration, no
+profile editing endpoint, no admin profile lookup in this step:
+profiles are written only by a signed approval + token redemption,
+and read only by the token holder.

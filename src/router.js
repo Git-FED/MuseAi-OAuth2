@@ -14,6 +14,7 @@ import { loginPageHandler } from "./oauth/login-page.js";
 import { authorizeHandler } from "./oauth/authorize.js";
 import { tokenHandler } from "./oauth/token.js";
 import { userinfoHandler } from "./oauth/userinfo.js";
+import { profileHandler } from "./oauth/profile.js";
 import { approvalHandler } from "./oauth/approval.js";
 import { pendingStatusHandler } from "./oauth/pending-status.js";
 import { denyHandler } from "./oauth/deny.js";
@@ -23,15 +24,16 @@ import { revocationHandler } from "./oauth/revocation.js";
 import { discoveryHandler } from "./oauth/discovery.js";
 import { jwksHandler } from "./oauth/jwks.js";
 
-// Step 11: browser CORS for the two public-client endpoints that a
+// Step 11: browser CORS for the public-client endpoints that a
 // third-party site calls from its own pages (e.g. the FED Hub login).
+// Step 16 adds /oauth/profile to the same set, for the same reason.
 // The login page itself is same-origin and never needed this; a site
 // like hub.fedos.workers.dev cannot read /oauth/token or /oauth/userinfo
 // responses without it. Narrow on purpose: admin, approval, and device
 // routes get no CORS headers and still 405 OPTIONS. No credentials mode:
 // the hub keeps tokens in sessionStorage, never cookies, so reflecting
 // the Origin here cannot leak a session to another site.
-const CORS_PATHS = new Set(["/oauth/token", "/oauth/userinfo"]);
+const CORS_PATHS = new Set(["/oauth/token", "/oauth/userinfo", "/oauth/profile"]);
 
 function corsHeaders(request) {
   const origin = request.headers.get("origin");
@@ -64,6 +66,8 @@ const ROUTES = [
   { method: "GET", path: "/oauth/authorize", handler: authorizeHandler },
   { method: "POST", path: "/oauth/token", handler: tokenHandler },
   { method: "GET", path: "/oauth/userinfo", handler: userinfoHandler },
+  // Step 16: profile record for the token's sub.
+  { method: "GET", path: "/oauth/profile", handler: profileHandler },
   { method: "POST", path: "/oauth/approval", handler: approvalHandler },
   // Step 13: auto-finish poll for the approval page.
   { method: "GET", path: "/oauth/pending-status", handler: pendingStatusHandler },

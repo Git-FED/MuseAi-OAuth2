@@ -8,6 +8,7 @@
 import { verifyPkce } from "../lib/crypto.js";
 import { audit } from "../lib/audit.js";
 import { getClient } from "../lib/registry.js";
+import { recordSignIn } from "../lib/profile.js";
 import { isValidClientId } from "../lib/validate.js";
 import { recordStub } from "../store/oauth-record.js";
 import { issueTokenPair, requireTokenConfig, rotateRefresh } from "../auth/tokens.js";
@@ -43,6 +44,10 @@ export async function tokenHandler(request, env) {
       scope: rec.scope,
       nonce: rec.nonce,
     });
+    // Step 16: a code redemption IS a fresh sign-in — record the
+    // profile. A failed profile write never fails the login (the
+    // function swallows it); the next sign-in repairs the record.
+    await recordSignIn(env, { sub: `muse:${rec.muse_id}`, username: rec.username, email: rec.email });
     await audit(env, "token_issued", { actor: `muse:${rec.muse_id}`, clientId, route: "/oauth/token", outcome: "success", detail: "authorization_code" });
     return json(pair);
   }
@@ -83,6 +88,9 @@ export async function tokenHandler(request, env) {
       scope: rec.scope,
       nonce: null,
     });
+    // Step 16: a device approval redemption is also a fresh sign-in.
+    // Refresh rotation deliberately does NOT call recordSignIn.
+    await recordSignIn(env, { sub: `muse:${rec.muse_id}`, username: rec.username, email: rec.email });
     await audit(env, "token_issued", { actor: `muse:${rec.muse_id}`, clientId, route: "/oauth/token", outcome: "success", detail: "device_code" });
     return json(devicePair);
   }
