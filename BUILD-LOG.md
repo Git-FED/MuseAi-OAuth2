@@ -755,6 +755,9 @@ Approval page (authorize + device) now has three buttons: Open Muse AI to approv
 ## Step 18 — Copy ID & Open Muse AI, one button (2026-10-31 evening)
 Approval page (authorize + device) now has a "Copy ID & Open Muse AI" button that does both in one tap, in order: copy the pending/device id first, then open muse.ai in the popup. The separate Open / Copy message / Copy ID buttons remain. Tests: 82/82 pass (80 old + 2 new step18 tests).
 
+## Step 25 — Auth-screen FAQ (2026-11-01)
+Agenda item 7, no mobile redesign. A "Having trouble?" section on the approval page: Open Muse AI opens the web browser, not the app; app-logged-in does not mean browser-logged-in; page checks every 2 seconds; 10-minute expiry means start fresh. Tests: step25 1/1.
+
 ## Step 24 — Toggleable Muse two-step, no codes (2026-11-01)
 Agenda item 1. Default OFF, never forced, toggled by the user only: GET/POST /oauth/two-step with a Bearer access token (401 without one, CORS like profile). When ON, an authorize sign-in requires a second Muse signature before any code is issued: first approval returns second_approval_required + a second pending id, the approval page poller switches to it and says "second approval needed," the copy buttons copy the second id, and the second signed approval completes the parent request and issues the code. No codes, SMS, or authenticator app — the Muse signature is the second factor, signed a second time. Device flow keeps single approval in this step. Tests: step24 2/2, plus step22/step23 set 7/7.
 

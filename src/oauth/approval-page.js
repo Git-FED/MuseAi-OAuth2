@@ -134,7 +134,7 @@ function deviceAutoFinish({ deviceCode, basePath = "" }) {
 // Step 17's standalone "Copy ID" was removed in step 19 as a duplicate
 // of "Copy ID & Open Muse AI".
 function musePopupHelper({ copyMessage, copyId }) {
-  return `<p>Your Muse does not get a ping from this page. Tap the purple button — it copies your approval message and opens Muse. Paste it in, hit send, and this page will finish itself.</p>
+  return `<details style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:600">Having trouble? Read this first</summary><p>“Open Muse AI” opens Muse in your web browser, not the Muse app. Being logged into the phone app does not mean you are logged into the phone browser — if the popup looks logged out, sign in there in the browser, then paste the approval message.</p><p>If the page keeps waiting: make sure you hit send on the pasted message in Muse, then wait a few seconds — this page checks every 2 seconds. If the request expired (10 minutes), close this page and start a fresh sign-in.</p><p>No code, no SMS, no authenticator app is ever needed — your Muse approving is the whole sign-in.</p></details><p>Your Muse does not get a ping from this page. Tap the purple button — it copies your approval message and opens Muse. Paste it in, hit send, and this page will finish itself.</p>
 <p>What happens next: your Muse approves, this page checks every 2 seconds, and it finishes itself within a few seconds of approval — you paste nothing back here. This request expires in 10 minutes, so approve soon or start a fresh sign-in.</p>
 <button id="copy-id-open-btn" type="button">Approve with Muse AI</button>
 <button id="open-muse-btn" type="button">Open Muse AI to approve</button>
