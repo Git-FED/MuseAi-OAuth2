@@ -41,8 +41,8 @@ function pageShell(title, body) {
   // phone screen with comfortable padding.
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>
 *{box-sizing:border-box}
-body{margin:0;padding:24px 16px;background:#e9e7e2;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.5}
-main{max-width:560px;margin:0 auto;background:#faf9f7;border:1px solid #d8d5cf;border-top:4px solid #1a1a1a;border-radius:12px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+body{margin:0;padding:24px 16px;background:#8fd8b8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.5}
+main{max-width:560px;margin:0 auto;background:#f7f3ea;border:1px solid #d8d5cf;border-top:4px solid #7c5cf0;border-radius:12px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.12)}
 h1{font-size:22px;line-height:1.25;margin:0 0 16px}
 p{margin:0 0 12px}
 ul{margin:0 0 12px;padding-left:20px}
@@ -50,10 +50,10 @@ li{margin:2px 0}
 label{font-weight:600}
 textarea,input[type="text"]{width:100%;padding:10px 12px;border:1px solid #ccc;border-radius:8px;font:inherit;margin:6px 0 12px}
 button{width:100%;padding:12px;border:0;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
-#copy-id-open-btn{background:#1a1a1a;color:#fff;margin-bottom:8px}
-#open-muse-btn{background:#1a1a1a;color:#fff}
-#copy-btn{background:transparent;color:#1a1a1a;border:1px solid #ccc;margin-top:8px}
-#deny-form button{background:transparent;color:#555;border:1px solid #ccc}
+#copy-id-open-btn{background:#7c5cf0;color:#fff;margin-bottom:8px}
+#open-muse-btn{background:#22c55e;color:#fff;margin-bottom:8px}
+#copy-btn{background:#2563eb;color:#fff;margin-top:8px}
+#deny-form button{background:#fff;color:#dc2626;border:1px solid #dc2626}
 #deny-form{margin-top:8px}
 #deny-result{font-weight:600}
 span#pending-id,span#user-code{word-break:break-all}

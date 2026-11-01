@@ -16,9 +16,9 @@ test("step19: standalone Copy ID button is gone, combined button remains", () =>
 });
 
 test("step19: login and approval pages share the non-white card look", () => {
-  assert.match(LOGIN_PAGE_HTML, /background: #e9e7e2/);
-  assert.match(LOGIN_PAGE_HTML, /border-top: 4px solid #1a1a1a/);
+  assert.match(LOGIN_PAGE_HTML, /background: #8fd8b8/);
+  assert.match(LOGIN_PAGE_HTML, /border-top: 4px solid #7c5cf0/);
   const page = authorizeApprovalPage(base);
-  assert.match(page, /background:#e9e7e2/);
-  assert.match(page, /border-top:4px solid #1a1a1a/);
+  assert.match(page, /background:#8fd8b8/);
+  assert.match(page, /border-top:4px solid #7c5cf0/);
 });
