@@ -45,6 +45,7 @@ export async function pendingStatusHandler(request, env) {
   // for the same waiting state — the poll API normalizes both to
   // "awaiting" so the page script only ever checks one value.
   if (rec.status === "awaiting" || rec.status === "pending") return json({ status: "awaiting" });
+  if (rec.status === "first_approved") return json({ status: "second_approval_required", second_pending_id: rec.second_pending_id || null });
   if (kind === "device") {
     // approved or denied: status only, the device client polls token.
     return json({ status: rec.status });

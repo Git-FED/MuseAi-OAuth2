@@ -17,6 +17,7 @@ import { userinfoHandler } from "./oauth/userinfo.js";
 import { profileHandler } from "./oauth/profile.js";
 import { approvalHandler } from "./oauth/approval.js";
 import { pendingStatusHandler } from "./oauth/pending-status.js";
+import { twoStepHandler } from "./oauth/two-step.js";
 import { denyHandler } from "./oauth/deny.js";
 import { deviceGetHandler, devicePostHandler } from "./oauth/device-entry.js";
 import { deviceAuthorizationHandler } from "./oauth/device-authorization.js";
@@ -33,7 +34,7 @@ import { jwksHandler } from "./oauth/jwks.js";
 // routes get no CORS headers and still 405 OPTIONS. No credentials mode:
 // the hub keeps tokens in sessionStorage, never cookies, so reflecting
 // the Origin here cannot leak a session to another site.
-const CORS_PATHS = new Set(["/oauth/token", "/oauth/userinfo", "/oauth/profile"]);
+const CORS_PATHS = new Set(["/oauth/token", "/oauth/userinfo", "/oauth/profile", "/oauth/two-step"]);
 
 function corsHeaders(request) {
   const origin = request.headers.get("origin");
@@ -68,6 +69,9 @@ const ROUTES = [
   { method: "GET", path: "/oauth/userinfo", handler: userinfoHandler },
   // Step 16: profile record for the token's sub.
   { method: "GET", path: "/oauth/profile", handler: profileHandler },
+  // Step 24: toggleable two-step, per-sub, default off.
+  { method: "GET", path: "/oauth/two-step", handler: twoStepHandler },
+  { method: "POST", path: "/oauth/two-step", handler: twoStepHandler },
   { method: "POST", path: "/oauth/approval", handler: approvalHandler },
   // Step 13: auto-finish poll for the approval page.
   { method: "GET", path: "/oauth/pending-status", handler: pendingStatusHandler },

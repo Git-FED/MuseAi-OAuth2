@@ -82,13 +82,23 @@ function authorizeAutoFinish({ pendingId, basePath = "" }) {
 <script>
 (function () {
   var statusEl = document.getElementById("auto-status");
+  var currentId = "${escapeHtml(pendingId)}";
   var timer = setInterval(async function () {
     var res;
-    try { res = await fetch("${basePath}/oauth/pending-status?pending_id=" + encodeURIComponent("${escapeHtml(pendingId)}")); }
+    try { res = await fetch("${basePath}/oauth/pending-status?pending_id=" + encodeURIComponent(currentId)); }
     catch { return; }
     var data = await res.json().catch(function () { return {}; });
     if (data.redirect_to) { clearInterval(timer); window.location = data.redirect_to; }
     else if (data.status === "awaiting") { return; }
+    else if (data.status === "second_approval_required" && data.second_pending_id) {
+      currentId = data.second_pending_id;
+      statusEl.textContent = "First approval done — second approval needed. Ask your Muse to approve again (same way, new request).";
+      var span = document.getElementById("pending-id");
+      if (span) span.textContent = currentId;
+      var fb = document.getElementById("approval-fallback");
+      if (fb) fb.value = fb.value.replace("${escapeHtml(pendingId)}", currentId);
+      return;
+    }
     else { clearInterval(timer); statusEl.textContent = "This sign-in request is no longer waiting. Close this page and try signing in again."; }
   }, 2000);
 })();
@@ -134,6 +144,8 @@ function musePopupHelper({ copyMessage, copyId }) {
 <script>
 document.getElementById("copy-id-open-btn").addEventListener("click", async function () {
   var msg = "${escapeHtml(copyMessage)}";
+  var span = document.getElementById("pending-id");
+  if (span && span.textContent !== "${escapeHtml(copyId)}") msg = msg.replace("${escapeHtml(copyId)}", span.textContent);
   var el = document.getElementById("copy-result");
   try { await navigator.clipboard.writeText(msg); el.textContent = "Approval message copied — opening Muse AI. Paste it in and hit send."; }
   catch { el.textContent = "Copy did not work in this browser — select and copy the message below, then paste it into Muse."; document.getElementById("approval-fallback").style.display = "block"; }
@@ -144,6 +156,8 @@ document.getElementById("open-muse-btn").addEventListener("click", function () {
 });
 document.getElementById("copy-btn").addEventListener("click", async function () {
   var msg = "${escapeHtml(copyMessage)}";
+  var span = document.getElementById("pending-id");
+  if (span && span.textContent !== "${escapeHtml(copyId)}") msg = msg.replace("${escapeHtml(copyId)}", span.textContent);
   var el = document.getElementById("copy-result");
   try { await navigator.clipboard.writeText(msg); el.textContent = "Copied — paste it into Muse in the popup."; }
   catch { el.textContent = "Copy did not work in this browser — select and copy the message below, then paste it into Muse."; document.getElementById("approval-fallback").style.display = "block"; }
