@@ -20,6 +20,15 @@
 // - (Step 18, speed-up) "Copy ID & Open Muse AI" does both in one
 //   tap, in order: copy the id first, then open muse.ai. One button
 //   instead of two separate taps.
+// - (Step 21, kill the copy/paste) muse.ai has no documented URL
+//   parameter that prefills a chat message (checked 2026-11-01), so
+//   a link alone cannot pre-type anything. The closest true version:
+//   the primary button now copies the FULL pre-written approval
+//   message (not just the id), then opens muse.ai — the user only
+//   pastes and hits send, nothing is typed or copied by hand. If
+//   clipboard access fails, the full message appears in a selectable
+//   box on the page instead of failing silently. The existing 2s
+//   poller still finishes the page itself once approved.
 // - Every value that comes from a registry record or a request is HTML-
 //   escaped before it reaches the page.
 // - Error pages say what went wrong in plain language, never a stack
@@ -115,17 +124,19 @@ function deviceAutoFinish({ deviceCode, basePath = "" }) {
 // Step 17's standalone "Copy ID" was removed in step 19 as a duplicate
 // of "Copy ID & Open Muse AI".
 function musePopupHelper({ copyMessage, copyId }) {
-  return `<p>Your Muse does not get a ping from this page. Open Muse here, paste the message below into it, and tell it to approve — this page will finish itself.</p>
-<button id="copy-id-open-btn" type="button">Copy ID &amp; Open Muse AI</button>
+  return `<p>Your Muse does not get a ping from this page. Tap the purple button — it copies your approval message and opens Muse. Paste it in, hit send, and this page will finish itself.</p>
+<p>What happens next: your Muse approves, this page checks every 2 seconds, and it finishes itself within a few seconds of approval — you paste nothing back here. This request expires in 10 minutes, so approve soon or start a fresh sign-in.</p>
+<button id="copy-id-open-btn" type="button">Approve with Muse AI</button>
 <button id="open-muse-btn" type="button">Open Muse AI to approve</button>
 <button id="copy-btn" type="button">Copy approval message</button>
 <p id="copy-result"></p>
+<textarea id="approval-fallback" readonly style="display:none">${escapeHtml(copyMessage)}</textarea>
 <script>
 document.getElementById("copy-id-open-btn").addEventListener("click", async function () {
-  var id = "${escapeHtml(copyId)}";
+  var msg = "${escapeHtml(copyMessage)}";
   var el = document.getElementById("copy-result");
-  try { await navigator.clipboard.writeText(id); el.textContent = "ID copied — opening Muse AI."; }
-  catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
+  try { await navigator.clipboard.writeText(msg); el.textContent = "Approval message copied — opening Muse AI. Paste it in and hit send."; }
+  catch { el.textContent = "Copy did not work in this browser — select and copy the message below, then paste it into Muse."; document.getElementById("approval-fallback").style.display = "block"; }
   window.open("https://muse.ai", "muse-approve", "width=480,height=720,noopener");
 });
 document.getElementById("open-muse-btn").addEventListener("click", function () {
@@ -135,7 +146,7 @@ document.getElementById("copy-btn").addEventListener("click", async function () 
   var msg = "${escapeHtml(copyMessage)}";
   var el = document.getElementById("copy-result");
   try { await navigator.clipboard.writeText(msg); el.textContent = "Copied — paste it into Muse in the popup."; }
-  catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
+  catch { el.textContent = "Copy did not work in this browser — select and copy the message below, then paste it into Muse."; document.getElementById("approval-fallback").style.display = "block"; }
 });
 </script>`;
 }
@@ -177,7 +188,7 @@ export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendin
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Pending request: <span id="pending-id">${escapeHtml(pendingId)}</span></p>
-${musePopupHelper({ copyMessage: `Please approve my Muse sign-in. Pending request: ${pendingId}`, copyId: pendingId })}
+${musePopupHelper({ copyMessage: `Hi Muse, I'm signing in to FedPromptly with Sign in with Muse. Please approve my Muse sign-in. Pending request: ${pendingId}. After you approve, my login page finishes itself in a few seconds — it checks every 2 seconds, and I don't need to paste anything back. This request expires in 10 minutes, so please approve soon.`, copyId: pendingId })}
 ${authorizeAutoFinish({ pendingId, basePath })}
 ${denyForm({ idField: "pending_id", idValue: pendingId, basePath })}`,
   );
@@ -210,7 +221,7 @@ export function deviceDetailPage({ clientName, scopes, deviceCode, userCode, bas
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Device code: <span id="user-code">${escapeHtml(userCode)}</span></p>
-${musePopupHelper({ copyMessage: `Please approve my Muse device sign-in. Device code: ${deviceCode}`, copyId: deviceCode })}
+${musePopupHelper({ copyMessage: `Hi Muse, I'm signing in to FedPromptly from a device with Sign in with Muse. Please approve my Muse device sign-in. Device code: ${deviceCode}. After you approve, my device finishes signing in within a few seconds. This request expires in 30 minutes, so please approve soon.`, copyId: deviceCode })}
 ${deviceAutoFinish({ deviceCode, basePath })}
 ${denyForm({ idField: "device_code", idValue: deviceCode, basePath })}`,
   );

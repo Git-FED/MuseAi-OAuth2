@@ -9,7 +9,7 @@ test("step19: standalone Copy ID button is gone, combined button remains", () =>
   const page = authorizeApprovalPage(base);
   assert.doesNotMatch(page, /id="copy-id-btn"/);
   assert.match(page, /id="copy-id-open-btn"/);
-  assert.match(page, /Copy ID &amp; Open Muse AI/);
+  assert.match(page, /Approve with Muse AI/);
   const device = deviceDetailPage({ clientName: "Test", scopes: ["openid"], deviceCode: "dev123", userCode: "ABCD-1234", basePath: "" });
   assert.doesNotMatch(device, /id="copy-id-btn"/);
   assert.match(device, /id="copy-id-open-btn"/);

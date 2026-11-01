@@ -754,3 +754,15 @@ Approval page (authorize + device) now has three buttons: Open Muse AI to approv
 
 ## Step 18 — Copy ID & Open Muse AI, one button (2026-10-31 evening)
 Approval page (authorize + device) now has a "Copy ID & Open Muse AI" button that does both in one tap, in order: copy the pending/device id first, then open muse.ai in the popup. The separate Open / Copy message / Copy ID buttons remain. Tests: 82/82 pass (80 old + 2 new step18 tests).
+
+## Step 22 — Copy with introduction, instructions, and wait times (2026-11-01)
+Git-FED's live feedback: the copied message came with zero introduction, zero instructions, and no wait times. Fixed in approval-page.js only: the copied message now opens with an introduction ("Hi Muse, I'm signing in to FedPromptly with Sign in with Muse"), states what to approve, explains the finish ("my login page finishes itself in a few seconds — it checks every 2 seconds, and I don't need to paste anything back"), and gives the expiry (10 minutes authorize, 30 minutes device). The page itself now states the same wait/expiry under the button, so it isn't only in the clipboard. Tests: step22 2/2, plus step19/20/21 set 8/8.
+
+## Step 21 — Kill the copy/paste (2026-11-01)
+muse.ai has no documented URL parameter that prefills a chat message, so a link alone cannot pre-type anything. Closest true version: the primary button is now "Approve with Muse AI" — one tap copies the FULL pre-written approval message (not just the id), then opens muse.ai; the user only pastes and hits send, nothing typed or copied by hand. If clipboard access fails, the full message appears in a selectable box instead of failing silently. The 2s poller still finishes the page itself once approved. Tests: steps 17/18/19/20/21 pass 10/10.
+
+## Step 20 — Color login, no more black/white buttons (2026-11-01)
+Step 19's warm off-white still read as white live, and its buttons were black/white. Both pages now: mint background (#8fd8b8, matching the READY promo image), warm cream card (#f7f3ea, not white), purple top bar. Buttons all different colors: Copy ID & Open Muse AI = purple (#7c5cf0), Open Muse AI = green (#22c55e), Copy approval message = blue (#2563eb), Deny = white with red border/text, login page primary = purple. Tests: step17/18/19/20 pass 8/8.
+
+## Step 19 — Login look + remove duplicate Copy ID (2026-11-01)
+Agenda items 3 + 4, first login work of Nov 1. Approval page: standalone "Copy ID" button, its CSS, and its click listener removed — there is now only one Copy ID button, "Copy ID & Open Muse AI". Remaining three buttons: "Copy ID & Open Muse AI", "Open Muse AI to approve", "Copy approval message". Login page (previously a plain white page) and approval page now share the same look: warm off-white background (#e9e7e2), off-white card with a dark top bar, dark primary button. Still serious/official, not a redesign. Tests: step17/18/19 tests pass (6/6 in that set); step13/14 and other worker-shim tests fail on a pre-existing Node cloudflare: loader error, unrelated to this change. Step 18 live verification is still owed before this is pushed.
