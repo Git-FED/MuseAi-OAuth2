@@ -751,3 +751,6 @@ and read only by the token holder.
 
 ## Step 17 — Copy ID button (2026-10-31 evening)
 Approval page (authorize + device) now has three buttons: Open Muse AI to approve (step 14), Copy approval message (step 14), and Copy ID (new — copies just the pending/device id alone). No flow change: page still polls and finishes itself, Muse still approves out-of-band with a signed payload. Tests: 80/80 pass (78 old + 2 new step17 tests).
+
+## Step 18 — Copy ID & Open Muse AI, one button (2026-10-31 evening)
+Approval page (authorize + device) now has a "Copy ID & Open Muse AI" button that does both in one tap, in order: copy the pending/device id first, then open muse.ai in the popup. The separate Open / Copy message / Copy ID buttons remain. Tests: 82/82 pass (80 old + 2 new step18 tests).

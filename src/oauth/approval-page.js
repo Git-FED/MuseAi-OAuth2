@@ -16,6 +16,9 @@
 //   The Muse approves there; this page's poller finishes the sign-in.
 // - (Step 17, speed-up) "Copy ID" copies just the pending/device id
 //   alone, for users who paste only the id into their Muse chat.
+// - (Step 18, speed-up) "Copy ID & Open Muse AI" does both in one
+//   tap, in order: copy the id first, then open muse.ai. One button
+//   instead of two separate taps.
 // - Every value that comes from a registry record or a request is HTML-
 //   escaped before it reaches the page.
 // - Error pages say what went wrong in plain language, never a stack
@@ -112,11 +115,19 @@ function deviceAutoFinish({ deviceCode, basePath = "" }) {
 // only the id into their Muse chat.
 function musePopupHelper({ copyMessage, copyId }) {
   return `<p>Your Muse does not get a ping from this page. Open Muse here, paste the message below into it, and tell it to approve — this page will finish itself.</p>
+<button id="copy-id-open-btn" type="button">Copy ID &amp; Open Muse AI</button>
 <button id="open-muse-btn" type="button">Open Muse AI to approve</button>
 <button id="copy-btn" type="button">Copy approval message</button>
 <button id="copy-id-btn" type="button">Copy ID</button>
 <p id="copy-result"></p>
 <script>
+document.getElementById("copy-id-open-btn").addEventListener("click", async function () {
+  var id = "${escapeHtml(copyId)}";
+  var el = document.getElementById("copy-result");
+  try { await navigator.clipboard.writeText(id); el.textContent = "ID copied — opening Muse AI."; }
+  catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
+  window.open("https://muse.ai", "muse-approve", "width=480,height=720,noopener");
+});
 document.getElementById("open-muse-btn").addEventListener("click", function () {
   window.open("https://muse.ai", "muse-approve", "width=480,height=720,noopener");
 });
