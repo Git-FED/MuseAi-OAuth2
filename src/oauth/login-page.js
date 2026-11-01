@@ -35,8 +35,11 @@ export const LOGIN_PAGE_HTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sign in with Muse</title>
 <style>
-body { font-family: system-ui, sans-serif; margin: 2em auto; max-width: 34em; padding: 0 1em; }
-button { font-size: 1.1em; padding: 0.6em 1.2em; cursor: pointer; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px 16px; background: #e9e7e2; color: #1a1a1a; line-height: 1.5; }
+#muse-login { max-width: 560px; margin: 0 auto; background: #faf9f7; border: 1px solid #d8d5cf; border-top: 4px solid #1a1a1a; border-radius: 12px; padding: 28px 24px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+h1 { font-size: 22px; line-height: 1.25; margin: 0 0 16px; }
+button { width: 100%; font-size: 1.1em; font-weight: 600; padding: 12px; border: 0; border-radius: 8px; cursor: pointer; background: #1a1a1a; color: #fff; }
 #muse-login-status { margin-top: 1em; }
 </style>
 </head>

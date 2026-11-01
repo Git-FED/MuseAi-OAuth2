@@ -14,8 +14,9 @@
 //   and "Copy approval message" copies a one-line message with the
 //   pending/device id for the user to paste into that popup chat.
 //   The Muse approves there; this page's poller finishes the sign-in.
-// - (Step 17, speed-up) "Copy ID" copies just the pending/device id
-//   alone, for users who paste only the id into their Muse chat.
+// - (Step 17, REMOVED in step 19) "Copy ID" was a duplicate of step 18's
+//   combined button, so it was removed — there is only one Copy ID
+//   button now, "Copy ID & Open Muse AI".
 // - (Step 18, speed-up) "Copy ID & Open Muse AI" does both in one
 //   tap, in order: copy the id first, then open muse.ai. One button
 //   instead of two separate taps.
@@ -40,8 +41,8 @@ function pageShell(title, body) {
   // phone screen with comfortable padding.
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>
 *{box-sizing:border-box}
-body{margin:0;padding:24px 16px;background:#f2f2f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.5}
-main{max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e2de;border-radius:12px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+body{margin:0;padding:24px 16px;background:#e9e7e2;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.5}
+main{max-width:560px;margin:0 auto;background:#faf9f7;border:1px solid #d8d5cf;border-top:4px solid #1a1a1a;border-radius:12px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
 h1{font-size:22px;line-height:1.25;margin:0 0 16px}
 p{margin:0 0 12px}
 ul{margin:0 0 12px;padding-left:20px}
@@ -49,9 +50,9 @@ li{margin:2px 0}
 label{font-weight:600}
 textarea,input[type="text"]{width:100%;padding:10px 12px;border:1px solid #ccc;border-radius:8px;font:inherit;margin:6px 0 12px}
 button{width:100%;padding:12px;border:0;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+#copy-id-open-btn{background:#1a1a1a;color:#fff;margin-bottom:8px}
 #open-muse-btn{background:#1a1a1a;color:#fff}
 #copy-btn{background:transparent;color:#1a1a1a;border:1px solid #ccc;margin-top:8px}
-#copy-id-btn{background:transparent;color:#1a1a1a;border:1px solid #ccc;margin-top:8px}
 #deny-form button{background:transparent;color:#555;border:1px solid #ccc}
 #deny-form{margin-top:8px}
 #deny-result{font-weight:600}
@@ -111,14 +112,13 @@ function deviceAutoFinish({ deviceCode, basePath = "" }) {
 // needs to sign (pending id for authorize, device code for device),
 // so the user pastes one line into the popup chat instead of typing
 // an id from memory. window.open runs only inside the click handler.
-// Step 17 adds "Copy ID": just the id alone, for users who paste
-// only the id into their Muse chat.
+// Step 17's standalone "Copy ID" was removed in step 19 as a duplicate
+// of "Copy ID & Open Muse AI".
 function musePopupHelper({ copyMessage, copyId }) {
   return `<p>Your Muse does not get a ping from this page. Open Muse here, paste the message below into it, and tell it to approve — this page will finish itself.</p>
 <button id="copy-id-open-btn" type="button">Copy ID &amp; Open Muse AI</button>
 <button id="open-muse-btn" type="button">Open Muse AI to approve</button>
 <button id="copy-btn" type="button">Copy approval message</button>
-<button id="copy-id-btn" type="button">Copy ID</button>
 <p id="copy-result"></p>
 <script>
 document.getElementById("copy-id-open-btn").addEventListener("click", async function () {
@@ -135,12 +135,6 @@ document.getElementById("copy-btn").addEventListener("click", async function () 
   var msg = "${escapeHtml(copyMessage)}";
   var el = document.getElementById("copy-result");
   try { await navigator.clipboard.writeText(msg); el.textContent = "Copied — paste it into Muse in the popup."; }
-  catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
-});
-document.getElementById("copy-id-btn").addEventListener("click", async function () {
-  var id = "${escapeHtml(copyId)}";
-  var el = document.getElementById("copy-result");
-  try { await navigator.clipboard.writeText(id); el.textContent = "ID copied — paste it into Muse in the popup."; }
   catch { el.textContent = "Copy did not work in this browser — paste the request shown above into Muse."; }
 });
 </script>`;
