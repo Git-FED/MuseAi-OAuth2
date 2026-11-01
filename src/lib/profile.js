@@ -59,9 +59,11 @@ export async function getProfile(env, sub) {
 }
 
 // Record one fresh sign-in. Keeps first_sign_in and increments the
-// count on a repeat sign-in; always updates username/email to the
-// latest approved identity (approval is the source of truth). Returns
-// true when the record was written, false otherwise (never throws).
+// count on a repeat sign-in; email updates to the latest approved
+// identity, but the username is LOCKED (step 23): a repeat sign-in
+// keeps the first recorded username, never overwrites it with a
+// different supplied username. Returns true when the record was
+// written, false otherwise (never throws).
 export async function recordSignIn(env, { sub, username, email, now = new Date() } = {}) {
   if (typeof sub !== "string" || !sub.startsWith("muse:") || !env.OAUTH_KV) return false;
   if (typeof username !== "string" || !username.trim() || typeof email !== "string" || !email.includes("@")) return false;
@@ -70,7 +72,7 @@ export async function recordSignIn(env, { sub, username, email, now = new Date()
     const existing = await getProfile(env, sub);
     const rec = {
       sub,
-      preferred_username: username,
+      preferred_username: existing ? existing.preferred_username : username,
       email,
       email_verified: false,
       first_sign_in: existing ? existing.first_sign_in : at,

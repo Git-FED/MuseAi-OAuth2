@@ -755,6 +755,9 @@ Approval page (authorize + device) now has three buttons: Open Muse AI to approv
 ## Step 18 — Copy ID & Open Muse AI, one button (2026-10-31 evening)
 Approval page (authorize + device) now has a "Copy ID & Open Muse AI" button that does both in one tap, in order: copy the pending/device id first, then open muse.ai in the popup. The separate Open / Copy message / Copy ID buttons remain. Tests: 82/82 pass (80 old + 2 new step18 tests).
 
+## Step 23 — Muse ID last-4 username, locked (2026-11-01)
+Agenda item 0. Token issuance now derives preferred_username from the Muse ID: digits in muse_id, last 4 (e.g. muse-987654 → 7654). A Muse ID with fewer than 4 digits (muse3 today) falls back to the approved username, so Git-FED's login does not break — the rule applies automatically to any future Muse ID with 4+ digits. Profile username is locked: a repeat sign-in keeps the first recorded username and updates only the email, so no dynamic username change is possible. Step 16's second-sign-in test updated to the locked expectation (not weakened — it now asserts the lock). Tests: step23 3/3, plus step22/step16 set 12/12.
+
 ## Step 22 — Copy with introduction, instructions, and wait times (2026-11-01)
 Git-FED's live feedback: the copied message came with zero introduction, zero instructions, and no wait times. Fixed in approval-page.js only: the copied message now opens with an introduction ("Hi Muse, I'm signing in to FedPromptly with Sign in with Muse"), states what to approve, explains the finish ("my login page finishes itself in a few seconds — it checks every 2 seconds, and I don't need to paste anything back"), and gives the expiry (10 minutes authorize, 30 minutes device). The page itself now states the same wait/expiry under the button, so it isn't only in the clipboard. Tests: step22 2/2, plus step19/20/21 set 8/8.
 

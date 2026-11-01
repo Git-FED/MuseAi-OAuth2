@@ -157,7 +157,7 @@ test("profile: first sign-in creates a profile keyed by sub", async () => {
   assert.ok(!Number.isNaN(Date.parse(prof.data.first_sign_in)));
 });
 
-test("profile: second sign-in keeps first, bumps count, updates identity", async () => {
+test("profile: second sign-in keeps first, bumps count, updates identity (step23: username locked)", async () => {
   const env = await makeEnv();
   const museKey = await registerMuse(env);
   const first = await signIn(env, museKey);
@@ -169,7 +169,7 @@ test("profile: second sign-in keeps first, bumps count, updates identity", async
   assert.equal(p2.data.sign_in_count, 2);
   assert.equal(p2.data.first_sign_in, p1.data.first_sign_in);
   assert.ok(Date.parse(p2.data.last_sign_in) >= Date.parse(p2.data.first_sign_in));
-  assert.equal(p2.data.preferred_username, "git-fed-2");
+  assert.equal(p2.data.preferred_username, "git-fed");
   assert.equal(p2.data.email, "other@example.com");
 });
 
