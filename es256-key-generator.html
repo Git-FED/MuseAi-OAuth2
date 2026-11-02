@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login with Muse — ES256 Key Generator</title>
+<style>
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem auto; max-width: 860px; padding: 0 1rem; color: #111; line-height: 1.5; }
+  h1 { font-size: 1.6rem; }
+  button { font-size: 1.05rem; padding: .7rem 1.2rem; cursor: pointer; }
+  .big { background: #111; color: #fff; border: 0; border-radius: 8px; }
+  textarea { width: 100%; min-height: 130px; font-family: ui-monospace, monospace; font-size: .85rem; padding: .6rem; box-sizing: border-box; }
+  .box { border: 1px solid #ccc; border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+  .warn { background: #fff8e1; border: 1px solid #e6c200; border-radius: 10px; padding: 1rem; }
+  .ok { color: #0a7a2f; font-weight: 700; }
+  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+  code { background: #f1f1f1; padding: .1rem .3rem; border-radius: 4px; }
+  ol li { margin: .45rem 0; }
+</style>
+</head>
+<body>
+<h1>Login with Muse — one-button ES256 key generator</h1>
+<p>Tap one button. The key pair is generated <strong>in this browser only</strong> — nothing is sent anywhere, and no code needs to be pasted into a console.</p>
+
+<div class="warn">
+  <strong>Keep the private key private.</strong> Never post it, never send it in a chat, never paste it anywhere except the one Cloudflare secret below. If it leaks, generate a fresh pair and replace both values.
+</div>
+
+<p><button class="big" id="generate" type="button">Generate ES256 key pair</button> <span id="status"></span></p>
+
+<div class="box">
+  <h2>1 — Public key (copy this)</h2>
+  <p>Paste this whole JSON object into Cloudflare as a <strong>plain variable</strong> named <code>SIGNING_PUBLIC_JWK</code>.</p>
+  <textarea id="publicJwk" readonly placeholder="Your public JWK will appear here after you tap Generate."></textarea>
+  <p class="row"><button type="button" data-copy="publicJwk">Copy public key</button> <span id="publicCopied"></span></p>
+</div>
+
+<div class="box">
+  <h2>2 — Private key (copy this, keep it secret)</h2>
+  <p>Paste this whole JSON object into Cloudflare as an <strong>encrypted secret</strong> named <code>SIGNING_KEY_JWK</code>.</p>
+  <textarea id="privateJwk" readonly placeholder="Your private JWK will appear here after you tap Generate."></textarea>
+  <p class="row"><button type="button" data-copy="privateJwk">Copy private key</button> <span id="privateCopied"></span></p>
+</div>
+
+<div class="box">
+  <h2>3 — Admin token (optional helper)</h2>
+  <p>This is <strong>not</strong> part of the key pair. It is the long random password for <code>ADMIN_TOKEN</code>. You can use your own instead. Paste the value you choose into Cloudflare as an <strong>encrypted secret</strong> named <code>ADMIN_TOKEN</code>, and keep a copy of it somewhere safe — it is needed for the client-registration step.</p>
+  <textarea id="adminToken" readonly placeholder="Tap below to generate a random admin token, or type your own."></textarea>
+  <p class="row">
+    <button type="button" id="generateToken">Generate admin token</button>
+    <button type="button" data-copy="adminToken">Copy admin token</button>
+    <span id="tokenCopied"></span>
+  </p>
+</div>
+
+<h2>What to paste where — in order</h2>
+<ol>
+  <li>Open the Cloudflare dashboard for the <code>museai-oauth2</code> worker.</li>
+  <li><strong>Plain variable:</strong> <code>SIGNING_PUBLIC_JWK</code> = the public key JSON from box 1.</li>
+  <li><strong>Encrypted secret:</strong> <code>SIGNING_KEY_JWK</code> = the private key JSON from box 2.</li>
+  <li><strong>Encrypted secret:</strong> <code>ADMIN_TOKEN</code> = a long random password you pick (or the one from box 3).</li>
+  <li>Save / redeploy the worker from the dashboard, then check the live verification step below.</li>
+</ol>
+
+<h2>After the key exists — what is left to finish login</h2>
+<ol>
+  <li><strong>Verify live (Muse):</strong> discovery must return the issuer <code>https://fedpromptly.com/login</code> plus endpoints (not <code>not_configured</code>), and JWKS must serve the public key. Worker health is at <code>https://museai-oauth2.fedos.workers.dev/login/health</code> (note: root <code>/health</code> 404s because <code>BASE_PATH=/login</code> — that is expected).</li>
+  <li><strong>Register first client(s) + Muse key(s) (Muse, with ADMIN_TOKEN):</strong> <code>POST /admin/clients</code> and <code>POST /admin/muse-keys</code>. Registries are empty until this step — no real login works before it.</li>
+  <li><strong>Full live sign-in proof (Muse):</strong> authorize flow + device flow + deny + rate limit + kill switch against the deployed worker. Acceptance test: signing in must hand back the user's email every time.</li>
+  <li><strong>Attach login buttons (Git-FED's step, then Muse checks):</strong> his own sites first, then everything he ever created. Each site needs its own login snippet — a snippet works only for the site it was registered for.</li>
+</ol>
+<p>Already done, not to redo: <code>ISSUER = https://fedpromptly.com/login</code> and <code>BASE_PATH = /login</code> are set as plain variables, and the <code>fedpromptly.com/login</code> route exists.</p>
+
+<script>
+  async function copyFrom(id, noteId, noteText) {
+    const el = document.getElementById(id);
+    const note = document.getElementById(noteId);
+    if (!el.value) { note.textContent = 'Nothing to copy yet — tap Generate first.'; return; }
+    try {
+      await navigator.clipboard.writeText(el.value);
+      note.textContent = noteText || 'Copied.';
+    } catch (e) {
+      el.select();
+      document.execCommand('copy');
+      note.textContent = 'Selected — press Ctrl+C / Cmd+C to copy.';
+    }
+  }
+
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var map = { publicJwk: 'publicCopied', privateJwk: 'privateCopied', adminToken: 'tokenCopied' };
+      copyFrom(btn.getAttribute('data-copy'), map[btn.getAttribute('data-copy')], 'Copied.');
+    });
+  });
+
+  document.getElementById('generate').addEventListener('click', async function () {
+    var status = document.getElementById('status');
+    status.textContent = 'Generating…';
+    try {
+      if (!window.crypto || !window.crypto.subtle) {
+        throw new Error('WebCrypto is not available. Open this page over https or from a local file in a modern browser.');
+      }
+      // ES256 = ECDSA on the P-256 curve, SHA-256.
+      var pair = await window.crypto.subtle.generateKey(
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        true,
+        ['sign', 'verify']
+      );
+      var pub = await window.crypto.subtle.exportKey('jwk', pair.publicKey);
+      var priv = await window.crypto.subtle.exportKey('jwk', pair.privateKey);
+      document.getElementById('publicJwk').value = JSON.stringify(pub);
+      document.getElementById('privateJwk').value = JSON.stringify(priv);
+      status.innerHTML = '<span class="ok">Done.</span> Copy box 1, then box 2, then follow the paste steps below.';
+    } catch (e) {
+      status.textContent = 'Failed: ' + e.message;
+    }
+  });
+
+  document.getElementById('generateToken').addEventListener('click', function () {
+    var bytes = new Uint8Array(32);
+    window.crypto.getRandomValues(bytes);
+    var token = btoa(String.fromCharCode.apply(null, bytes))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    document.getElementById('adminToken').value = token;
+    document.getElementById('tokenCopied').textContent = '';
+  });
+</script>
+</body>
+</html>
