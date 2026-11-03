@@ -46,6 +46,7 @@ button { width: 100%; font-size: 1.1em; font-weight: 600; padding: 12px; border:
 <body>
 <div id="muse-login">
   <h1>Sign in with Muse</h1>
+  <label><input id="muse-remember" type="checkbox"> Remember me</label>
   <button id="muse-login-btn" type="button">Sign in with Muse</button>
   <p id="muse-login-status"></p>
 </div>
@@ -74,6 +75,10 @@ button { width: 100%; font-size: 1.1em; font-weight: 600; padding: 12px; border:
     return b64url(new Uint8Array(d));
   }
 
+  // Step 26 Remember me, opt-in only. Checked: authorize carries
+  // remember=true. Unchecked: omitted entirely (one-time only).
+  // This is NOT a persistent session via Muse ID.
+  var rememberBox = document.getElementById("muse-remember");
   btn.addEventListener("click", async function () {
     var verifier = randomString(48);
     var state = randomString(24);
@@ -88,6 +93,7 @@ button { width: 100%; font-size: 1.1em; font-weight: 600; padding: 12px; border:
       scope: "openid",
       state: state,
     });
+    if (rememberBox && rememberBox.checked) q.set("remember", "true");
     location.href = BASE + "/oauth/authorize?" + q.toString();
   });
 

@@ -775,3 +775,12 @@ Step 19's warm off-white still read as white live, and its buttons were black/wh
 
 ## Step 19 — Login look + remove duplicate Copy ID (2026-11-01)
 Agenda items 3 + 4, first login work of Nov 1. Approval page: standalone "Copy ID" button, its CSS, and its click listener removed — there is now only one Copy ID button, "Copy ID & Open Muse AI". Remaining three buttons: "Copy ID & Open Muse AI", "Open Muse AI to approve", "Copy approval message". Login page (previously a plain white page) and approval page now share the same look: warm off-white background (#e9e7e2), off-white card with a dark top bar, dark primary button. Still serious/official, not a redesign. Tests: step17/18/19 tests pass (6/6 in that set); step13/14 and other worker-shim tests fail on a pre-existing Node cloudflare: loader error, unrelated to this change. Step 18 live verification is still owed before this is pushed.
+
+## Step 26 — Remember me, opt-in only (2026-11-02)
+- Login page (src/oauth/login-page.js): a "Remember me" checkbox, unchecked by default. Checked: the authorize request carries remember=true. Unchecked: it is omitted entirely (one-time login only).
+- Authorize (src/oauth/authorize.js): only the literal value "true" counts; it is stored on the pending record and passed to the approval page. No other flow change.
+- Approval page (src/oauth/approval-page.js): a "Remember me" checkbox, checked only when remember=true arrived, and the copied approval message carries a "Remember me: yes" line only then; otherwise that line is omitted entirely.
+- Muse verification confirmation (approval page): a "Confirm before approval" section showing the site and scopes, stating the Muse must verify all of this information back to the user and the user must confirm it before login completes. No login completes without that confirmation.
+- Explicitly NOT a persistent session via Muse ID: stated in code comments in all three files. Step 26 does not build one, and it does not change any signing key, secret, variable name, or snippet.
+- Tests: tests/step26.test.mjs, 3/3 pass (checked box + remember line + confirmation; unchecked box + no remember line; login page checkbox + carry-through). Full suite: 21 pass / 13 fail — same 13 failing files as the pristine step 25 bundle (pre-existing worker-shim failures noted in earlier steps), no regressions; step 26 adds 3 passes.
+- Zip below supersedes step 25 the same way: full bundle, push this one only.

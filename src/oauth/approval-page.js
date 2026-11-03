@@ -31,6 +31,10 @@
 //   poller still finishes the page itself once approved.
 // - Every value that comes from a registry record or a request is HTML-
 //   escaped before it reaches the page.
+// - (Step 26) Remember me, opt-in only, on the authorize approval
+//   page: a checkbox, checked only when remember=true arrived.
+//   The copied message carries a Remember me line only then.
+//   Step 26 is explicitly NOT a persistent session via Muse ID.
 // - Error pages say what went wrong in plain language, never a stack
 //   trace or an internal detail.
 
@@ -185,13 +189,21 @@ document.getElementById("deny-form").addEventListener("submit", async (e) => {
 </script>`;
 }
 
+// Step 26 Muse verification confirmation, shown BEFORE approval.
+// Before login completes, the Muse must verify all of this info
+// (site, scopes) back to the user, and the user must confirm it.
+// Nothing completes without that confirmation.
+function museVerificationConfirmation({ clientName, redirectHost, scopes }) {
+  return `<section id="muse-verification-confirmation"><h2>Confirm before approval</h2><p>Before this login completes, your Muse must verify all of this information back to you, and you must confirm it:</p><ul><li>Site: ${escapeHtml(clientName)} (${escapeHtml(redirectHost)})</li><li>Access: ${scopes.map((s) => escapeHtml(s)).join(", ")}</li></ul><p>No login completes without that confirmation.</p></section>`;
+}
+
 // Authorize-flow approval page. Shown BEFORE any approval, so the user
 // can see exactly what they are being asked to agree to.
 // basePath is the provider's mount prefix ("" at root, "/login" on
 // fedpromptly.com): every internal link/form on the page is prefixed
 // with it, so the page works at either mount. Client redirect URIs
 // are never touched — they are not provider URLs.
-export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendingId, basePath = "" }) {
+export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendingId, basePath = "", remember = false }) {
   return pageShell(
     "Sign in with Muse",
     `<h1>Sign in with Muse</h1>
@@ -202,7 +214,9 @@ export function authorizeApprovalPage({ clientName, redirectHost, scopes, pendin
 <p>Signing in will share your email address with ${escapeHtml(clientName)}. Your email is collected on every sign-in and is returned as unverified (email_verified: false). Verification is a later, separate step and never blocks your sign-in.</p>
 <p>Your Muse approves this request with its registered signature. There is no username or password field here — approval comes only from your Muse's signed approval.</p>
 <p>Pending request: <span id="pending-id">${escapeHtml(pendingId)}</span></p>
-${musePopupHelper({ copyMessage: `Hi Muse, I'm signing in to FedPromptly with Sign in with Muse. Please approve my Muse sign-in. Pending request: ${pendingId}. After you approve, my login page finishes itself in a few seconds — it checks every 2 seconds, and I don't need to paste anything back. This request expires in 10 minutes, so please approve soon.`, copyId: pendingId })}
+<p><label><input id="remember-me" type="checkbox"${remember ? " checked" : ""}> Remember me</label></p>
+${museVerificationConfirmation({ clientName, redirectHost, scopes })}
+${musePopupHelper({ copyMessage: `Hi Muse, I'm signing in to FedPromptly with Sign in with Muse. Please approve my Muse sign-in. Pending request: ${pendingId}.${remember ? ' Remember me: yes, I opted in to Remember me.' : ''} After you approve, my login page finishes itself in a few seconds — it checks every 2 seconds, and I don't need to paste anything back. This request expires in 10 minutes, so please approve soon.`, copyId: pendingId })}
 ${authorizeAutoFinish({ pendingId, basePath })}
 ${denyForm({ idField: "pending_id", idValue: pendingId, basePath })}`,
   );

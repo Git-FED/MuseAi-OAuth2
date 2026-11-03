@@ -56,6 +56,10 @@ export async function authorizeHandler(request, env) {
     return redirectWithError(redirectUri, "invalid_scope", state);
   }
 
+  // Step 26 Remember me, opt-in only: only literal "true" counts.
+  // Anything else is one-time login only. NOT a persistent session
+  // via Muse ID.
+  const remember = q.get("remember") === "true";
   const pendingId = randomString(24);
   try {
     await recordStub(env, `pending:${pendingId}`).create(
@@ -68,6 +72,7 @@ export async function authorizeHandler(request, env) {
         state: state || null,
         nonce: q.get("nonce"),
         status: "awaiting",
+        remember,
       },
       PENDING_TTL_MS,
     );
@@ -81,6 +86,7 @@ export async function authorizeHandler(request, env) {
     redirectHost: host,
     scopes: scope,
     pendingId,
+    remember,
     basePath: normalizeBasePath(env.BASE_PATH),
   }));
 }
