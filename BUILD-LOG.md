@@ -784,3 +784,27 @@ Agenda items 3 + 4, first login work of Nov 1. Approval page: standalone "Copy I
 - Explicitly NOT a persistent session via Muse ID: stated in code comments in all three files. Step 26 does not build one, and it does not change any signing key, secret, variable name, or snippet.
 - Tests: tests/step26.test.mjs, 3/3 pass (checked box + remember line + confirmation; unchecked box + no remember line; login page checkbox + carry-through). Full suite: 21 pass / 13 fail — same 13 failing files as the pristine step 25 bundle (pre-existing worker-shim failures noted in earlier steps), no regressions; step 26 adds 3 passes.
 - Zip below supersedes step 25 the same way: full bundle, push this one only.
+
+## Step 27 — Muse3 as the approval-key generator (2026-11-02)
+- Plain language: Muse generates and holds the muse3 Ed25519 approval
+  key locally. Only the public half is registered with the worker, via
+  the admin endpoint. Future approvals are signed from local storage,
+  with no Slack search needed — that Slack lookup was what made the
+  previous approval slow. The old Slack #private-data muse3 key was
+  left untouched as a fallback record; it does not verify against the
+  live worker until it is re-registered, because the registry now
+  points at the locally-held key.
+- Included in this bundle: tools/muse-approve.py (copied from Muse's
+  local helper) + tools/README.md. It takes a pending_id, signs the
+  canonical muse-approval-v1 message, and POSTs the approval. It
+  never prints a private key, an auth code, or a redirect. It is
+  Muse's local tool — it is NOT a worker route.
+- No worker code change in this step: src/oauth/* logic, signing
+  keys, secrets, variable names, and snippets are all unchanged.
+  No key was re-registered live as part of building this bundle,
+  and no key values are in this bundle.
+- Tests: tests/step27.test.mjs (helper presence/usage/no-key-print
+  checks, helper syntax check, local sign/verify round-trip with a
+  fresh throwaway test key, and a no-worker-code-change check).
+- Zip below supersedes step 26 the same way: full bundle, push this
+  one only, if Git-FED chooses to push it.
